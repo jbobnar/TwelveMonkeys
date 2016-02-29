@@ -28,15 +28,17 @@
 
 package com.twelvemonkeys.imageio.plugins.tiff;
 
-import com.twelvemonkeys.imageio.metadata.exif.TIFF;
-import com.twelvemonkeys.imageio.spi.ImageReaderSpiBase;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.Iterator;
+import java.util.Locale;
 
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.spi.ServiceRegistry;
 import javax.imageio.stream.ImageInputStream;
-import java.io.IOException;
-import java.nio.ByteOrder;
-import java.util.Locale;
+
+import com.twelvemonkeys.imageio.metadata.exif.TIFF;
+import com.twelvemonkeys.imageio.spi.ImageReaderSpiBase;
 
 /**
  * TIFFImageReaderSpi
@@ -63,6 +65,32 @@ public class TIFFImageReaderSpi extends ImageReaderSpiBase {
 
             if (appleSpi != null && appleSpi.getVendorName() != null && appleSpi.getVendorName().startsWith("Apple")) {
                 registry.setOrdering((Class<ImageReaderSpi>) category, this, appleSpi);
+            }
+        }
+        catch (ClassNotFoundException ignore) {
+            // This is actually OK, now we don't have to do anything
+        }
+
+        moveForward(registry, category, "com.twelvemonkeys.imageio.plugins.cr2.CR2ImageReaderSpi");
+//        moveForward(registry, category, "com.twelvemonkeys.imageio.plugins.dng.DNGImageReaderSpi");
+        moveForward(registry, category, "com.twelvemonkeys.imageio.plugins.nef.NEFImageReaderSpi");
+        Iterator<ImageReaderSpi> spi = registry.getServiceProviders((Class<ImageReaderSpi>)category, true);
+        ImageReaderSpi irs;
+        while(spi.hasNext()) {
+            irs = spi.next();
+            if (irs.getClass().getName().startsWith("it.tidalwave")) {
+                registry.setOrdering((Class<ImageReaderSpi>) category, irs, this);
+            }
+        }
+    }
+
+    private void moveForward(ServiceRegistry registry, Class<?> category, String spiClass) {
+        try {
+            Class<ImageReaderSpi> providerClass = (Class<ImageReaderSpi>) Class.forName(spiClass);
+            ImageReaderSpi spi = registry.getServiceProviderByClass(providerClass);
+
+            if (spi != null) {
+                registry.setOrdering((Class<ImageReaderSpi>) category, spi, this);
             }
         }
         catch (ClassNotFoundException ignore) {
