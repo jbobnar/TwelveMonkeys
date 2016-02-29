@@ -45,17 +45,21 @@
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-core</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-core</artifactId>
+            <version>${project.version}</version>
+            <classifier>tests</classifier>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-metadata</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
-            <version>3.4.1</version>
+            <version>${project.version}</version>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-jpeg</artifactId>
         </dependency>

@@ -45,6 +45,7 @@ import com.twelvemonkeys.imageio.metadata.exif.EXIFReader;
 import com.twelvemonkeys.imageio.metadata.exif.TIFF;
 import com.twelvemonkeys.imageio.spi.ProviderInfo;
 
+
 /**
  * CR2ImageReaderSpi
  *
