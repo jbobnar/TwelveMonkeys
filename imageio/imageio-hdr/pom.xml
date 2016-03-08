@@ -27,4 +27,5 @@
             <artifactId>imageio-metadata</artifactId>
         </dependency>
     </dependencies>
+    <version>${project.version}</version>
 </project>

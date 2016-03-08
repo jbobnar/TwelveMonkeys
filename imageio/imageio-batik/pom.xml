@@ -86,8 +86,8 @@
             </exclusions>
         </dependency>
     </dependencies>
-
     <properties>
         <batik.version>1.9</batik.version>
     </properties>
+    <version>${project.version}</version>
 </project>
