@@ -139,4 +139,5 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+    <version>${project.version}</version>
 </project>
