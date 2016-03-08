@@ -49,8 +49,6 @@
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-core</artifactId>
-            <version>${project.version}</version>
-            <classifier>tests</classifier>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
@@ -63,4 +61,5 @@
         </dependency>
     </dependencies>
 
+    <version>${project.version}</version>
 </project>

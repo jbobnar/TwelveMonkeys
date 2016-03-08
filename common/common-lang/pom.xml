@@ -13,4 +13,5 @@
         The TwelveMonkeys Common Language support
     </description>
 
+    <version>${project.version}</version>
 </project>
