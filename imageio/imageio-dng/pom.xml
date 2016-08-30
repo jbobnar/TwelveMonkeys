@@ -36,7 +36,7 @@
         <version>3.3-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-
+    <version>${project.version}</version>
     <artifactId>imageio-dng</artifactId>
     <name>TwelveMonkeys :: ImageIO :: DNG plugin</name>
     <description>ImageIO plugin for Adobe Digital Negative and TIFF/EP (DNG).</description>

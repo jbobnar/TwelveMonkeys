@@ -7,6 +7,7 @@
         <version>3.3-SNAPSHOT</version>
     </parent>
     <artifactId>imageio-clippath</artifactId>
+    <version>${project.version}</version>
     <name>TwelveMonkeys :: ImageIO :: Photoshop Path Support</name>
     <description>
         Photoshop Clipping Path Support.

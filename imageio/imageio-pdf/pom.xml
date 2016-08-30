@@ -8,6 +8,7 @@
     </parent>
     <artifactId>imageio-pdf</artifactId>
     <name>TwelveMonkeys :: ImageIO :: PDF plugin</name>
+    <version>${project.version}</version>    
     <description>
         ImageIO plugin for Adobe Portable Document Format (PDF).
     </description>

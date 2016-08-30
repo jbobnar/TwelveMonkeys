@@ -7,6 +7,7 @@
         <version>3.3-SNAPSHOT</version>
     </parent>
     <artifactId>common-lang</artifactId>
+    <version>${project.version}</version>    
     <packaging>jar</packaging>
     <name>TwelveMonkeys :: Common :: Language support</name>
     <description>

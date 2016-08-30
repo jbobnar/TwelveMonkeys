@@ -7,6 +7,7 @@
         <version>3.3-SNAPSHOT</version>
     </parent>
     <artifactId>imageio-iff</artifactId>
+    <version>${project.version}</version>
     <name>TwelveMonkeys :: ImageIO :: IFF plugin</name>
     <description>
         ImageIO plugin for Amiga/Electronic Arts Interchange Filed Format (IFF)

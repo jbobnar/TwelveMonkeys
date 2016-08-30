@@ -7,6 +7,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>imageio-metadata</artifactId>
+    <version>${project.version}</version>    
     <name>TwelveMonkeys :: ImageIO :: Metadata</name>
     <description>
         ImageIO metadata module.
