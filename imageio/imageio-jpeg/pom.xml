@@ -8,6 +8,7 @@
     </parent>
     <artifactId>imageio-jpeg</artifactId>
     <name>TwelveMonkeys :: ImageIO :: JPEG plugin</name>
+    <version>${project.version}</version>
     <description>
         ImageIO plugin for Joint Photographer Expert Group images (JPEG/JFIF).
     </description>

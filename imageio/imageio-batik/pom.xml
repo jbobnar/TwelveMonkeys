@@ -8,6 +8,7 @@
     </parent>
     <artifactId>imageio-batik</artifactId>
     <name>TwelveMonkeys :: ImageIO :: Batik Plugin</name>
+    <version>${project.version}</version>
     <description>
         <![CDATA[
         ImageIO wrapper for the Batik SVG Toolkit, enabling Scalable Vector Graphics (SVG) support.

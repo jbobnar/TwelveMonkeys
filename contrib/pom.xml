@@ -8,6 +8,7 @@
     </parent>
     <groupId>com.twelvemonkeys.contrib</groupId>
     <artifactId>contrib</artifactId>
+    <version>${project.version}</version>    
     <name>TwelveMonkeys :: Contrib</name>
     <description>
       Contributions to TwelveMonkeys which are not matching into the ImageIO plug-ins.

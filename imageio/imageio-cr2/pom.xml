@@ -36,7 +36,7 @@
         <version>${project.version}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-
+    <version>${project.version}</version>
     <artifactId>imageio-cr2</artifactId>
     <name>TwelveMonkeys :: ImageIO :: CR2 plugin</name>
     <description>ImageIO plugin for Canon RAW (CR2) format.</description>
