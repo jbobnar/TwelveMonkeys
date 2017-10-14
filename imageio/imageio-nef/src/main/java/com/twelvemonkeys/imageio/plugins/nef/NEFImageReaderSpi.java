@@ -44,7 +44,6 @@ import com.twelvemonkeys.imageio.metadata.Entry;
 import com.twelvemonkeys.imageio.metadata.exif.EXIFReader;
 import com.twelvemonkeys.imageio.metadata.exif.TIFF;
 import com.twelvemonkeys.imageio.spi.ProviderInfo;
-import com.twelvemonkeys.imageio.util.IIOUtil;
 
 /**
  * CR2ImageReaderSpi
@@ -55,7 +54,7 @@ import com.twelvemonkeys.imageio.util.IIOUtil;
  */
 public final class NEFImageReaderSpi extends ImageReaderSpi {
     public NEFImageReaderSpi() {
-        this(IIOUtil.getProviderInfo(NEFImageReaderSpi.class));
+        this(new ProviderInfo(NEFImageReaderSpi.class.getPackage()));
     }
 
     private NEFImageReaderSpi(final ProviderInfo pProviderInfo) {

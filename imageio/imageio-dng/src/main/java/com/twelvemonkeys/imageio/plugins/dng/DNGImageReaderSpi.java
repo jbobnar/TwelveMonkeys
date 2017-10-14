@@ -40,7 +40,6 @@ import javax.imageio.stream.ImageInputStream;
 
 import com.twelvemonkeys.imageio.metadata.exif.TIFF;
 import com.twelvemonkeys.imageio.spi.ProviderInfo;
-import com.twelvemonkeys.imageio.util.IIOUtil;
 
 /**
  * CR2ImageReaderSpi
@@ -51,7 +50,7 @@ import com.twelvemonkeys.imageio.util.IIOUtil;
  */
 public final class DNGImageReaderSpi extends ImageReaderSpi {
     public DNGImageReaderSpi() {
-        this(IIOUtil.getProviderInfo(DNGImageReaderSpi.class));
+        this(new ProviderInfo(DNGImageReaderSpi.class.getPackage()));
     }
 
     private DNGImageReaderSpi(final ProviderInfo pProviderInfo) {

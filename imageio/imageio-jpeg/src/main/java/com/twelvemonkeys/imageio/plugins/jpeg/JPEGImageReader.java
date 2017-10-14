@@ -837,6 +837,10 @@ public final class JPEGImageReader extends ImageReaderBase {
         // TODO: Allow metadata to contain the wrongly indexed profiles, if readable
         // NOTE: We ignore any profile with wrong index for reading and image types, just to be on the safe side
 
+        if (!Boolean.parseBoolean(System.getProperty("doColorManagement", "true"))) {
+            return null;
+        }
+        
         List<Application> segments = getAppSegments(JPEG.APP2, "ICC_PROFILE");
 
         // TODO: Possibly move this logic to the ICCProfile class...

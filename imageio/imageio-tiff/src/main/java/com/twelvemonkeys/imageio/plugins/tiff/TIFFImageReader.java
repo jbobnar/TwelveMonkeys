@@ -2200,6 +2200,9 @@ public final class TIFFImageReader extends ImageReaderBase {
     }
 
     private ICC_Profile getICCProfile() throws IOException {
+        if (!Boolean.parseBoolean(System.getProperty("doColorManagement", "true"))) {
+            return null;
+        }
         Entry entry = currentIFD.getEntryById(TIFF.TAG_ICC_PROFILE);
 
         if (entry != null) {

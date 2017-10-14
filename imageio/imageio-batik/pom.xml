@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.twelvemonkeys.imageio</groupId>
         <artifactId>imageio</artifactId>
-        <version>3.4-SNAPSHOT</version>
+        <version>${project.version}</version>
     </parent>
     <artifactId>imageio-batik</artifactId>
     <name>TwelveMonkeys :: ImageIO :: Batik Plugin</name>
@@ -90,4 +90,5 @@
     <properties>
         <batik.version>1.8</batik.version>
     </properties>
+    <version>${project.version}</version>
 </project>
