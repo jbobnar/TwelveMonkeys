@@ -3,7 +3,7 @@
     <parent>
         <groupId>com.twelvemonkeys</groupId>
         <artifactId>twelvemonkeys</artifactId>
-        <version>3.5-SNAPSHOT</version>
+        <version>${project.version}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.twelvemonkeys.imageio</groupId>
@@ -57,8 +57,8 @@
     </modules>
 
     <properties>
-        <core.version>3.1-SNAPSHOT</core.version>
-        <imageio.core.version>3.1-SNAPSHOT</imageio.core.version>
+        <core.version>${project.version}</core.version>
+        <imageio.core.version>${project.version}</imageio.core.version>
     </properties>
 
     <dependencies>
