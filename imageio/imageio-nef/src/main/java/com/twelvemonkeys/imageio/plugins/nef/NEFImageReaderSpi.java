@@ -44,10 +44,6 @@ import com.twelvemonkeys.imageio.metadata.Entry;
 import com.twelvemonkeys.imageio.metadata.exif.EXIFReader;
 import com.twelvemonkeys.imageio.metadata.exif.TIFF;
 import com.twelvemonkeys.imageio.spi.ProviderInfo;
-<<<<<<< HEAD
-=======
-import com.twelvemonkeys.imageio.util.IIOUtil;
->>>>>>> Pulled the cr2, dng and nef plugins from a separate branch.
 
 /**
  * CR2ImageReaderSpi
@@ -58,11 +54,7 @@ import com.twelvemonkeys.imageio.util.IIOUtil;
  */
 public final class NEFImageReaderSpi extends ImageReaderSpi {
     public NEFImageReaderSpi() {
-<<<<<<< HEAD
         this(new ProviderInfo(NEFImageReaderSpi.class.getPackage()));
-=======
-        this(IIOUtil.getProviderInfo(NEFImageReaderSpi.class));
->>>>>>> Pulled the cr2, dng and nef plugins from a separate branch.
     }
 
     private NEFImageReaderSpi(final ProviderInfo pProviderInfo) {

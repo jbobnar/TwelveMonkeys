@@ -57,8 +57,13 @@
     </modules>
 
     <properties>
+<<<<<<< HEAD
         <core.version>3.4.1</core.version>
         <imageio.core.version>3.4.1</imageio.core.version>
+=======
+        <core.version>${project.version}</core.version>
+        <imageio.core.version>${project.version}</imageio.core.version>
+>>>>>>> Fixed compiler errors. Updated version numbers.
     </properties>
 
     <dependencies>

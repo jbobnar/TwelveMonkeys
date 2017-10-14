@@ -149,6 +149,32 @@ public final class TIFFImageReaderSpi extends ImageReaderSpiBase {
         catch (ClassNotFoundException ignore) {
             // This is actually OK, now we don't have to do anything
         }
+
+        moveForward(registry, category, "com.twelvemonkeys.imageio.plugins.cr2.CR2ImageReaderSpi");
+//        moveForward(registry, category, "com.twelvemonkeys.imageio.plugins.dng.DNGImageReaderSpi");
+        moveForward(registry, category, "com.twelvemonkeys.imageio.plugins.nef.NEFImageReaderSpi");
+        Iterator<ImageReaderSpi> spi = registry.getServiceProviders((Class<ImageReaderSpi>)category, true);
+        ImageReaderSpi irs;
+        while(spi.hasNext()) {
+            irs = spi.next();
+            if (irs.getClass().getName().startsWith("it.tidalwave")) {
+                registry.setOrdering((Class<ImageReaderSpi>) category, irs, this);
+            }
+        }
+    }
+
+    private void moveForward(ServiceRegistry registry, Class<?> category, String spiClass) {
+        try {
+            Class<ImageReaderSpi> providerClass = (Class<ImageReaderSpi>) Class.forName(spiClass);
+            ImageReaderSpi spi = registry.getServiceProviderByClass(providerClass);
+
+            if (spi != null) {
+                registry.setOrdering((Class<ImageReaderSpi>) category, spi, this);
+            }
+        }
+        catch (ClassNotFoundException ignore) {
+            // This is actually OK, now we don't have to do anything
+        }
     }
 
     public boolean canDecodeInput(final Object pSource) throws IOException {
