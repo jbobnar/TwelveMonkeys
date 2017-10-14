@@ -33,12 +33,11 @@ import org.junit.Test;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.util.Arrays;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
 /**
  * CCITTFaxDecoderStreamTest
@@ -75,6 +74,13 @@ public class CCITTFaxDecoderStreamTest {
     // Line 4: V-1, V0, V0 EOL EOL
     static final byte[] DATA_G4 = { 0x04, 0x17, (byte) 0xF5, (byte) 0x80, 0x08, 0x00, (byte) 0x80 };
 
+    static final byte[] DATA_G4_ALIGNED = {
+            0x04, 0x14, // 00000100 000101(00)
+            (byte) 0xE0,    // 111 (00000)
+            (byte) 0xE0,   // 111 (00000)
+            0x58 // 01011 (000)
+    };
+
     // TODO: Better tests (full A4 width scan lines?)
 
     // From http://www.mikekohn.net/file_formats/tiff.php
@@ -109,11 +115,11 @@ public class CCITTFaxDecoderStreamTest {
     // 1 1 1 0 1 1 x x
     // 1 1 1 0 1 1 x x
     // 1 1 0 0 1 1 x x
-    BufferedImage image;
+    final BufferedImage image = new BufferedImage(6, 4, BufferedImage.TYPE_BYTE_BINARY);;
 
     @Before
     public void init() {
-        image = new BufferedImage(6, 4, BufferedImage.TYPE_BYTE_BINARY);
+
         for (int y = 0; y < 4; y++) {
             for (int x = 0; x < 6; x++) {
                 image.setRGB(x, y, x != 3 ? 0xff000000 : 0xffffffff);
@@ -199,5 +205,99 @@ public class CCITTFaxDecoderStreamTest {
         byte[] bytes = new byte[imageData.length];
         new DataInputStream(stream).readFully(bytes);
         assertArrayEquals(imageData, bytes);
+    }
+
+    @Test
+    public void testDecodeMissingRows() throws IOException {
+        // See https://github.com/haraldk/TwelveMonkeys/pull/225 and https://github.com/haraldk/TwelveMonkeys/issues/232
+        InputStream inputStream = getClass().getResourceAsStream("/tiff/ccitt_tolessrows.tif");
+
+        // Skip until StripOffsets: 8
+        for (int i = 0; i < 8; i++) {
+            inputStream.read();
+        }
+
+        // Read until StripByteCounts: 7
+        byte[] data = new byte[7];
+        new DataInputStream(inputStream).readFully(data);
+
+        InputStream stream = new CCITTFaxDecoderStream(new ByteArrayInputStream(data),
+                6, TIFFExtension.COMPRESSION_CCITT_T6, 1, 0L);
+
+        byte[] bytes = new byte[6]; // 6 x 6 pixel, 1 bpp => 6 bytes
+        new DataInputStream(stream).readFully(bytes);
+
+        // Pad image data with 0s
+        byte[] imageData = Arrays.copyOf(((DataBufferByte) image.getData().getDataBuffer()).getData(), 6);
+        assertArrayEquals(imageData, bytes);
+
+        // Ideally, we should have no more data now, but the stream don't know that...
+        // assertEquals("Should contain no more data", -1, stream.read());
+    }
+
+    @Test
+    public void testMoreChangesThanColumns() throws IOException {
+        // Produces an CCITT Stream with 9 changes on 8 columns.
+        byte[] data = new byte[] {(byte) 0b10101010};
+        ByteArrayOutputStream imageOutput = new ByteArrayOutputStream();
+        OutputStream outputSteam = new CCITTFaxEncoderStream(imageOutput,
+                8, 1, TIFFExtension.COMPRESSION_CCITT_T6, 1, 0L);
+        outputSteam.write(data);
+        outputSteam.close();
+
+        byte[] encoded = imageOutput.toByteArray();
+        InputStream inputStream = new CCITTFaxDecoderStream(new ByteArrayInputStream(encoded), 8,
+                TIFFExtension.COMPRESSION_CCITT_T6, 1, 0L);
+        byte decoded = (byte) inputStream.read();
+        assertEquals(data[0], decoded);
+    }
+
+    @Test
+    public void testMoreChangesThanColumnsFile() throws IOException {
+        // See https://github.com/haraldk/TwelveMonkeys/issues/328
+        // 26 changes on 24 columns: H0w1b, H1w1b, ..., H1w0b
+        InputStream stream = getClass().getResourceAsStream("/tiff/ccitt-too-many-changes.tif");
+
+        // Skip bytes before StripOffsets: 86
+        for (int i = 0; i < 86; i++) {
+            stream.read();
+        }
+
+        InputStream inputStream = new CCITTFaxDecoderStream(stream,
+                24, TIFFExtension.COMPRESSION_CCITT_T6, 1, 0L);
+        byte decoded = (byte) inputStream.read();
+        assertEquals((byte) 0b10101010, decoded);
+    }
+
+    @Test
+    public void testDecodeType4ByteAligned() throws IOException {
+        CCITTFaxDecoderStream stream = new CCITTFaxDecoderStream(new ByteArrayInputStream(DATA_G4_ALIGNED), 6,
+                TIFFExtension.COMPRESSION_CCITT_T6, 1, 0L);
+        stream.setOptionByteAligned(true);
+
+        byte[] imageData = ((DataBufferByte) image.getData().getDataBuffer()).getData();
+        byte[] bytes = new byte[imageData.length];
+        new DataInputStream(stream).readFully(bytes);
+        assertArrayEquals(imageData, bytes);
+    }
+  
+    @Test
+    public void testG3AOE() throws IOException {
+        InputStream inputStream = getClass().getResourceAsStream("/tiff/ccitt/g3aoe.tif");
+
+        // Skip until StripOffsets: 8
+        for (int i = 0; i < 8; i++) {
+            inputStream.read();
+        }
+
+        // Read until StripByteCounts: 20050
+        byte[] data = new byte[20050];
+        new DataInputStream(inputStream).readFully(data);
+
+        InputStream stream = new CCITTFaxDecoderStream(new ByteArrayInputStream(data),
+                1728, TIFFExtension.COMPRESSION_CCITT_T4, 1, TIFFExtension.GROUP3OPT_FILLBITS);
+
+        byte[] bytes = new byte[216 * 1168]; // 1728 x 1168 pixel, 1 bpp => 216 bytes * 1168
+        new DataInputStream(stream).readFully(bytes);
     }
 }

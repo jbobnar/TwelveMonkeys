@@ -2,9 +2,10 @@ package com.twelvemonkeys.imageio.plugins.tiff;
 
 import com.twelvemonkeys.imageio.metadata.Directory;
 import com.twelvemonkeys.imageio.metadata.Entry;
-import com.twelvemonkeys.imageio.metadata.exif.EXIFReader;
-import com.twelvemonkeys.imageio.metadata.exif.Rational;
-import com.twelvemonkeys.imageio.metadata.exif.TIFF;
+import com.twelvemonkeys.imageio.metadata.tiff.Rational;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFF;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFFEntry;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFFReader;
 import com.twelvemonkeys.imageio.stream.URLImageInputStreamSpi;
 import com.twelvemonkeys.lang.StringUtil;
 import org.junit.Test;
@@ -22,6 +23,8 @@ import javax.imageio.stream.ImageInputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.junit.Assert.*;
 
@@ -47,7 +50,7 @@ public class TIFFImageMetadataTest {
     // TODO: Candidate abstract super method
     private IIOMetadata createMetadata(final String resource) throws IOException {
         try (ImageInputStream input = ImageIO.createImageInputStream(getClassLoaderResource(resource))) {
-            Directory ifd = new EXIFReader().read(input);
+            Directory ifd = new TIFFReader().read(input);
 //            System.err.println("ifd: " + ifd);
             return new TIFFImageMetadata(ifd);
         }
@@ -228,7 +231,6 @@ public class TIFFImageMetadataTest {
         ifdNode.appendChild(tiffField);
 
         assertNodeNotEquals("Modified tree does not differ", nativeTree, nativeTree2);
-
     }
 
     @Test
@@ -473,6 +475,67 @@ public class TIFFImageMetadataTest {
         metadata.setFromTree(nativeFormat, new IIOMetadataNode(nativeFormat)); // Requires at least one child node
     }
 
+    @Test
+    public void testStandardChromaSamplesPerPixel() {
+        Set<Entry> entries = new HashSet<>();
+        entries.add(new TIFFEntry(TIFF.TAG_PHOTOMETRIC_INTERPRETATION, TIFFBaseline.PHOTOMETRIC_RGB));
+        entries.add(new TIFFEntry(TIFF.TAG_SAMPLES_PER_PIXEL, 4));
+        entries.add(new TIFFEntry(TIFF.TAG_BITS_PER_SAMPLE, new int[] {8, 8, 8})); // This is incorrect, just making sure the correct value is selected
+
+        IIOMetadataNode chromaNode = new TIFFImageMetadata(entries).getStandardChromaNode();
+        assertNotNull(chromaNode);
+
+        IIOMetadataNode numChannels = (IIOMetadataNode) chromaNode.getElementsByTagName("NumChannels").item(0);
+        assertEquals("4", numChannels.getAttribute("value"));
+    }
+
+    @Test
+    public void testStandardChromaSamplesPerPixelFallbackBitsPerSample() {
+        Set<Entry> entries = new HashSet<>();
+        entries.add(new TIFFEntry(TIFF.TAG_PHOTOMETRIC_INTERPRETATION, TIFFBaseline.PHOTOMETRIC_RGB));
+        entries.add(new TIFFEntry(TIFF.TAG_BITS_PER_SAMPLE, new int[] {8, 8, 8}));
+
+        IIOMetadataNode chromaNode = new TIFFImageMetadata(entries).getStandardChromaNode();
+        assertNotNull(chromaNode);
+
+        IIOMetadataNode numChannels = (IIOMetadataNode) chromaNode.getElementsByTagName("NumChannels").item(0);
+        assertEquals("3", numChannels.getAttribute("value"));
+    }
+
+    @Test
+    public void testStandardChromaSamplesPerPixelFallbackDefault() {
+        Set<Entry> entries = new HashSet<>();
+        entries.add(new TIFFEntry(TIFF.TAG_PHOTOMETRIC_INTERPRETATION, TIFFBaseline.PHOTOMETRIC_BLACK_IS_ZERO));
+
+        IIOMetadataNode chromaNode = new TIFFImageMetadata(entries).getStandardChromaNode();
+        assertNotNull(chromaNode);
+        IIOMetadataNode numChannels = (IIOMetadataNode) chromaNode.getElementsByTagName("NumChannels").item(0);
+        assertEquals("1", numChannels.getAttribute("value"));
+    }
+
+    @Test
+    public void testStandardDataBitsPerSampleFallbackDefault() {
+        Set<Entry> entries = new HashSet<>();
+        entries.add(new TIFFEntry(TIFF.TAG_PHOTOMETRIC_INTERPRETATION, TIFFBaseline.PHOTOMETRIC_BLACK_IS_ZERO));
+
+        IIOMetadataNode dataNode = new TIFFImageMetadata(entries).getStandardDataNode();
+        assertNotNull(dataNode);
+        IIOMetadataNode numChannels = (IIOMetadataNode) dataNode.getElementsByTagName("BitsPerSample").item(0);
+        assertEquals("1", numChannels.getAttribute("value"));
+    }
+
+    @Test
+    public void testStandardNodeSamplesPerPixelFallbackDefault() {
+        Set<Entry> entries = new HashSet<>();
+        entries.add(new TIFFEntry(TIFF.TAG_PHOTOMETRIC_INTERPRETATION, TIFFBaseline.PHOTOMETRIC_RGB));
+
+        // Just to make sure we haven't accidentally missed something
+        IIOMetadataNode standardTree = (IIOMetadataNode) new TIFFImageMetadata(entries).getAsTree(IIOMetadataFormatImpl.standardMetadataFormatName);
+        assertNotNull(standardTree);
+    }
+
+    // TODO: Test that failed set leaves metadata unchanged
+
     private void assertSingleNodeWithValue(final NodeList fields, final int tag, int type, final String... expectedValue) {
         String tagNumber = String.valueOf(tag);
         String typeName = StringUtil.capitalize(TIFF.TYPE_NAMES[type].toLowerCase());
@@ -504,8 +567,6 @@ public class TIFFImageMetadataTest {
 
         assertTrue("No tag " + tagNumber + " found", foundTag);
     }
-
-    // TODO: Test that failed set leaves metadata unchanged
 
     static void createTIFFFieldNode(final IIOMetadataNode parentIFDNode, int tag, short type, Object value) {
         IIOMetadataNode fieldNode = new IIOMetadataNode("TIFFField");

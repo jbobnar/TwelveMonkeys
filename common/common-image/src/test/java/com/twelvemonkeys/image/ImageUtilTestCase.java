@@ -1,23 +1,16 @@
 
 package com.twelvemonkeys.image;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import org.junit.Test;
 
-import java.awt.Image;
+import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.IndexColorModel;
 import java.awt.image.RenderedImage;
 import java.io.InputStream;
 
-import javax.imageio.ImageIO;
-
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 public class ImageUtilTestCase {
 
@@ -110,11 +103,6 @@ public class ImageUtilTestCase {
         // Should have same dimensions
         assertEquals(scaled.getWidth(null), bufferedScaled.getWidth());
         assertEquals(scaled.getHeight(null), bufferedScaled.getHeight());
-
-        // Hmmm...
-//        assertTrue(new Integer(42).equals(bufferedScaled.getProperty("lucky-number"))
-//                || bufferedScaled.getPropertyNames() == null
-//                || bufferedScaled.getPropertyNames().length == 0);
     }
 
     @Test

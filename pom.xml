@@ -8,7 +8,7 @@
     </parent>
     <groupId>com.twelvemonkeys</groupId>
     <artifactId>twelvemonkeys</artifactId>
-    <version>3.3-SNAPSHOT</version>
+    <version>3.4-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Twelvemonkeys</name>
 
@@ -61,6 +61,13 @@
         <contributor>
             <name>Jason Palmer</name>
             <email>jpalmer@itemmaster.com</email>
+            <roles>
+                <role>contributor</role>
+            </roles>
+        </contributor>
+        <contributor>
+            <name>Hermann Kroll</name>
+            <email>dev.hkroll@gmail.com</email>
             <roles>
                 <role>contributor</role>
             </roles>

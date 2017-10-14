@@ -34,6 +34,7 @@ import java.io.EOFException;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 
 /**
  * CCITT Modified Huffman RLE, Group 3 (T4) and Group 4 (T6) fax compression.
@@ -61,12 +62,16 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
     private int changesReferenceRowCount;
     private int changesCurrentRowCount;
 
+    private int lastChangingElement = 0;
+
     private boolean optionG32D = false;
 
     @SuppressWarnings("unused") // Leading zeros for aligning EOL
     private boolean optionG3Fill = false;
 
     private boolean optionUncompressed = false;
+
+    private boolean optionByteAligned = false;
 
     public CCITTFaxDecoderStream(final InputStream stream, final int columns, final int type, final int fillOrder,
                                  final long options) {
@@ -85,10 +90,13 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
                 fillOrder, "Expected fill order 1  or 2: %s"
         );
 
-        this.changesReferenceRow = new int[columns];
-        this.changesCurrentRow = new int[columns];
+        this.changesReferenceRow = new int[columns + 2];
+        this.changesCurrentRow = new int[columns + 2];
 
         switch (type) {
+            case TIFFBaseline.COMPRESSION_CCITT_MODIFIED_HUFFMAN_RLE:
+                optionByteAligned = true;
+                break;
             case TIFFExtension.COMPRESSION_CCITT_T4:
                 optionG32D = (options & TIFFExtension.GROUP3OPT_2DENCODING) != 0;
                 optionG3Fill = (options & TIFFExtension.GROUP3OPT_FILLBITS) != 0;
@@ -101,6 +109,15 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
 
         Validate.isTrue(!optionUncompressed, optionUncompressed,
                 "CCITT GROUP 3/4 OPTION UNCOMPRESSED is not supported");
+    }
+
+    /**
+     * This is used for CCITT streams from PDF files, which use EncodedByteAlign
+     *
+     * @param enable enable byte alignment
+     */
+    public void setOptionByteAligned(boolean enable) {
+        optionByteAligned = enable;
     }
 
     private void fetch() throws IOException {
@@ -184,7 +201,7 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
                         case VALUE_PASSMODE:
                             int pChangingElement = getNextChangingElement(index, white) + 1;
 
-                            if (pChangingElement >= changesReferenceRowCount || pChangingElement == -1) {
+                            if (pChangingElement >= changesReferenceRowCount) {
                                 index = columns;
                             }
                             else {
@@ -218,23 +235,36 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
     }
 
     private int getNextChangingElement(final int a0, final boolean white) {
-        int start = white ? 0 : 1;
+        int start = (lastChangingElement & 0xFFFF_FFFE) + (white ? 0 : 1);
+        if (start > 2) {
+            start -= 2;
+        }
+
+        if (a0 == 0) {
+            return start;
+        }
 
         for (int i = start; i < changesReferenceRowCount; i += 2) {
-            if (a0 < changesReferenceRow[i] || (a0 == 0 && changesReferenceRow[i] == 0)) {
+            if (a0 < changesReferenceRow[i]) {
+                lastChangingElement = i;
                 return i;
             }
-        }        
+        }
 
         return -1;
     }
 
     private void decodeRowType2() throws IOException {
-        resetBuffer();
+        if (optionByteAligned) {
+            resetBuffer();
+        }
         decode1D();
     }
 
     private void decodeRowType4() throws IOException {
+        if (optionByteAligned) {
+            resetBuffer();
+        }
         eof: while (true) {
             // read till next EOL code
             Node n = eolOnlyTree.root;
@@ -261,6 +291,9 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
     }
 
     private void decodeRowType6() throws IOException {
+        if (optionByteAligned) {
+            resetBuffer();
+        }
         decode2D();
     }
 
@@ -280,7 +313,7 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
         int index = 0;
         boolean white = true;
 
-        
+        lastChangingElement = 0;
         for (int i = 0; i <= changesCurrentRowCount; i++) {
             int nextChange = columns;
 
@@ -344,28 +377,21 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
 
             if (n.isLeaf) {
                 total += n.value;
-                if (n.value < 64) {
+                if (n.value >= 64) {
+                    n = tree.root;
+                }
+                else if (n.value >= 0) {
                     return total;
                 }
                 else {
-                    n = tree.root;
+                    return columns;
                 }
             }
         }
     }
 
     private void resetBuffer() throws IOException {
-        for (int i = 0; i < decodedRow.length; i++) {
-            decodedRow[i] = 0;
-        }
-
-        while (true) {
-            if (bufferPos == -1) {
-                return;
-            }
-
-            readBit();
-        }
+        bufferPos = -1;
     }
 
     int buffer = -1;
@@ -403,14 +429,14 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
     @Override
     public int read() throws IOException {
         if (decodedLength < 0) {
-            return -1;
+            return 0x0;
         }
 
         if (decodedPos >= decodedLength) {
             fetch();
 
             if (decodedLength < 0) {
-                return -1;
+                return 0x0;
             }
         }
 
@@ -420,14 +446,16 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
         if (decodedLength < 0) {
-            return -1;
+            Arrays.fill(b, off, off + len, (byte) 0x0);
+            return len;
         }
 
         if (decodedPos >= decodedLength) {
             fetch();
 
             if (decodedLength < 0) {
-                return -1;
+                Arrays.fill(b, off, off + len, (byte) 0x0);
+                return len;
             }
         }
 
@@ -567,146 +595,146 @@ final class CCITTFaxDecoderStream extends FilterInputStream {
     static final short[][] BLACK_CODES = {
             { // 2 bits
               0x2, 0x3,
-            },
+              },
             { // 3 bits
               0x2, 0x3,
-            },
+              },
             { // 4 bits
               0x2, 0x3,
-            },
+              },
             { // 5 bits
               0x3,
-            },
+              },
             { // 6 bits
               0x4, 0x5,
-            },
+              },
             { // 7 bits
               0x4, 0x5, 0x7,
-            },
+              },
             { // 8 bits
               0x4, 0x7,
-            },
+              },
             { // 9 bits
               0x18,
-            },
+              },
             { // 10 bits
               0x17, 0x18, 0x37, 0x8, 0xf,
-            },
+              },
             { // 11 bits
               0x17, 0x18, 0x28, 0x37, 0x67, 0x68, 0x6c, 0x8, 0xc, 0xd,
-            },
+              },
             { // 12 bits
               0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x1c, 0x1d, 0x1e, 0x1f, 0x24, 0x27, 0x28, 0x2b, 0x2c, 0x33,
               0x34, 0x35, 0x37, 0x38, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x64, 0x65,
               0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xd2, 0xd3,
               0xd4, 0xd5, 0xd6, 0xd7, 0xda, 0xdb,
-            },
+              },
             { // 13 bits
               0x4a, 0x4b, 0x4c, 0x4d, 0x52, 0x53, 0x54, 0x55, 0x5a, 0x5b, 0x64, 0x65, 0x6c, 0x6d, 0x72, 0x73,
               0x74, 0x75, 0x76, 0x77,
-            }
+              }
     };
     static final short[][] BLACK_RUN_LENGTHS = {
             { // 2 bits
               3, 2,
-            },
+              },
             { // 3 bits
               1, 4,
-            },
+              },
             { // 4 bits
               6, 5,
-            },
+              },
             { // 5 bits
               7,
-            },
+              },
             { // 6 bits
               9, 8,
-            },
+              },
             { // 7 bits
               10, 11, 12,
-            },
+              },
             { // 8 bits
               13, 14,
-            },
+              },
             { // 9 bits
               15,
-            },
+              },
             { // 10 bits
               16, 17, 0, 18, 64,
-            },
+              },
             { // 11 bits
               24, 25, 23, 22, 19, 20, 21, 1792, 1856, 1920,
-            },
+              },
             { // 12 bits
               1984, 2048, 2112, 2176, 2240, 2304, 2368, 2432, 2496, 2560, 52, 55, 56, 59, 60, 320, 384, 448, 53,
               54, 50, 51, 44, 45, 46, 47, 57, 58, 61, 256, 48, 49, 62, 63, 30, 31, 32, 33, 40, 41, 128, 192, 26,
               27, 28, 29, 34, 35, 36, 37, 38, 39, 42, 43,
-            },
+              },
             { // 13 bits
               640, 704, 768, 832, 1280, 1344, 1408, 1472, 1536, 1600, 1664, 1728, 512, 576, 896, 960, 1024, 1088,
               1152, 1216,
-            }
+              }
     };
 
     public static final short[][] WHITE_CODES = {
             { // 4 bits
               0x7, 0x8, 0xb, 0xc, 0xe, 0xf,
-            },
+              },
             { // 5 bits
               0x12, 0x13, 0x14, 0x1b, 0x7, 0x8,
-            },
+              },
             { // 6 bits
               0x17, 0x18, 0x2a, 0x2b, 0x3, 0x34, 0x35, 0x7, 0x8,
-            },
+              },
             { // 7 bits
               0x13, 0x17, 0x18, 0x24, 0x27, 0x28, 0x2b, 0x3, 0x37, 0x4, 0x8, 0xc,
-            },
+              },
             { // 8 bits
               0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x1a, 0x1b, 0x2, 0x24, 0x25, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d,
               0x3, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x4, 0x4a, 0x4b, 0x5, 0x52, 0x53, 0x54, 0x55, 0x58, 0x59,
               0x5a, 0x5b, 0x64, 0x65, 0x67, 0x68, 0xa, 0xb,
-            },
+              },
             { // 9 bits
               0x98, 0x99, 0x9a, 0x9b, 0xcc, 0xcd, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb,
-            },
+              },
             { // 10 bits
             },
             { // 11 bits
               0x8, 0xc, 0xd,
-            },
+              },
             { // 12 bits
               0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x1c, 0x1d, 0x1e, 0x1f,
-            }
+              }
     };
 
     public static final short[][] WHITE_RUN_LENGTHS = {
             { // 4 bits
               2, 3, 4, 5, 6, 7,
-            },
+              },
             { // 5 bits
               128, 8, 9, 64, 10, 11,
-            },
+              },
             { // 6 bits
               192, 1664, 16, 17, 13, 14, 15, 1, 12,
-            },
+              },
             { // 7 bits
               26, 21, 28, 27, 18, 24, 25, 22, 256, 23, 20, 19,
-            },
+              },
             { // 8 bits
               33, 34, 35, 36, 37, 38, 31, 32, 29, 53, 54, 39, 40, 41, 42, 43, 44, 30, 61, 62, 63, 0, 320, 384, 45,
               59, 60, 46, 49, 50, 51, 52, 55, 56, 57, 58, 448, 512, 640, 576, 47, 48,
-            },
+              },
             { // 9 bits
               1472, 1536, 1600, 1728, 704, 768, 832, 896, 960, 1024, 1088, 1152, 1216, 1280, 1344, 1408,
-            },
+              },
             { // 10 bits
             },
             { // 11 bits
               1792, 1856, 1920,
-            },
+              },
             { // 12 bits
               1984, 2048, 2112, 2176, 2240, 2304, 2368, 2432, 2496, 2560,
-            }
+              }
     };
 
     final static Node EOL;

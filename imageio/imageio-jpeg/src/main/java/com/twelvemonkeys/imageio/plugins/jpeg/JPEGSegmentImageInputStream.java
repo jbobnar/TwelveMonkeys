@@ -240,15 +240,20 @@ final class JPEGSegmentImageInputStream extends ImageInputStreamImpl {
     private void streamInit() throws IOException {
         stream.seek(0);
 
-        int soi = stream.readUnsignedShort();
-        if (soi != JPEG.SOI) {
-            throw new IIOException(String.format("Not a JPEG stream (starts with: 0x%04x, expected SOI: 0x%04x)", soi, JPEG.SOI));
-        }
-        else {
+        try {
+            int soi = stream.readUnsignedShort();
+
+            if (soi != JPEG.SOI) {
+                throw new IIOException(String.format("Not a JPEG stream (starts with: 0x%04x, expected SOI: 0x%04x)", soi, JPEG.SOI));
+            }
+
             segment = new Segment(soi, 0, 0, 2);
 
             segments.add(segment);
             currentSegment = segments.size() - 1; // 0
+        }
+        catch (EOFException eof) {
+            throw new IIOException(String.format("Not a JPEG stream (short stream. expected SOI: 0x%04x)", JPEG.SOI), eof);
         }
     }
 
@@ -356,7 +361,6 @@ final class JPEGSegmentImageInputStream extends ImageInputStreamImpl {
             return stream.read(b, off, len);
         }
 
-
         @Override
         public String toString() {
             return String.format("0x%04x[%d-%d]", marker, realStart, realEnd());
@@ -404,7 +408,7 @@ final class JPEGSegmentImageInputStream extends ImageInputStreamImpl {
             byte[] replacementData = new byte[length];
 
             int numQTs = length / 128;
-            int newSegmentLength = 2 + 1 + 64 * numQTs;
+            int newSegmentLength = 2 + (1 + 64) * numQTs; // Len + (qtInfo + qtSize) * numQTs
 
             replacementData[0] = (byte) ((JPEG.DQT >> 8) & 0xff);
             replacementData[1] = (byte) (JPEG.DQT & 0xff);

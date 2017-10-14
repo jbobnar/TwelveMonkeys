@@ -29,19 +29,27 @@ package com.twelvemonkeys.imageio.plugins.tiff;/*
 import com.twelvemonkeys.imageio.util.ImageReaderAbstractTest;
 import org.junit.Test;
 
+import javax.imageio.IIOException;
+import javax.imageio.ImageIO;
 import javax.imageio.ImageReadParam;
+import javax.imageio.ImageReader;
 import javax.imageio.event.IIOReadWarningListener;
+import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.Raster;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.*;
+import static org.junit.internal.matchers.StringContains.containsString;
 import static org.mockito.Matchers.contains;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.*;
@@ -88,6 +96,10 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
                 new TestData(getClassLoaderResource("/tiff/lzw-rgba-padded-icc.tif"), new Dimension(19, 11)), // RGBA, LZW compression with padded ICC profile
                 new TestData(getClassLoaderResource("/tiff/lzw-rgba-4444.tif"), new Dimension(64, 64)), // RGBA, LZW compression with UINT 4/4/4/4 + gray 2/2
                 new TestData(getClassLoaderResource("/tiff/lzw-buffer-overflow.tif"), new Dimension(5, 49)), // RGBA, LZW compression, will throw IOOBE if small buffer
+                new TestData(getClassLoaderResource("/tiff/lzw-colormap-iiobe.tif"), new Dimension(2550, 3300)), // RGBA, LZW compression, will throw IOOBE if small buffer
+                new TestData(getClassLoaderResource("/tiff/scan-mono-iccgray.tif"), new Dimension(2408, 3436)), // B/W, PackBits w/gray ICC profile
+                new TestData(getClassLoaderResource("/tiff/planar-striped-lzw.tif"), new Dimension(229, 229)), // RGB 8 bit/sample, planar, LZW compression
+                new TestData(getClassLoaderResource("/tiff/colormap-with-extrasamples.tif"), new Dimension(10, 10)), // Palette, 8 bit/sample, 2 samples/pixel, extra samples, LZW
                 // CCITT
                 new TestData(getClassLoaderResource("/tiff/ccitt/group3_1d.tif"), new Dimension(6, 4)), // B/W, CCITT T4 1D
                 new TestData(getClassLoaderResource("/tiff/ccitt/group3_1d_fill.tif"), new Dimension(6, 4)), // B/W, CCITT T4 1D
@@ -95,14 +107,22 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
                 new TestData(getClassLoaderResource("/tiff/ccitt/group3_2d_fill.tif"), new Dimension(6, 4)), // B/W, CCITT T4 2D
                 new TestData(getClassLoaderResource("/tiff/ccitt/group3_2d_lsb2msb.tif"), new Dimension(6, 4)), // B/W, CCITT T4 2D, LSB
                 new TestData(getClassLoaderResource("/tiff/ccitt/group4.tif"), new Dimension(6, 4)), // B/W, CCITT T6 1D
+                new TestData(getClassLoaderResource("/tiff/ccitt_tolessrows.tif"), new Dimension(6, 6)), // CCITT, metadata claiming 6 rows, stream contains only 4
                 new TestData(getClassLoaderResource("/tiff/fivepages-scan-causingerrors.tif"), new Dimension(2480, 3518)), // B/W, CCITT T4
+                new TestData(getClassLoaderResource("/tiff/CCITTgetNextChangingElement.tif"), new Dimension(2402,195)),
+                new TestData(getClassLoaderResource("/tiff/ccitt-too-many-changes.tif"), new Dimension(24,153)),
                 // CIELab
                 new TestData(getClassLoaderResource("/tiff/ColorCheckerCalculator.tif"), new Dimension(798, 546)), // CIELab 8 bit/sample
                 // Gray
                 new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-02.tif"), new Dimension(73, 43)), // Gray 2 bit/sample
                 new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-04.tif"), new Dimension(73, 43)), // Gray 4 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-06.tif"), new Dimension(73, 43)), // Gray 6 bit/sample
                 new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-08.tif"), new Dimension(73, 43)), // Gray 8 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-10.tif"), new Dimension(73, 43)), // Gray 10 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-12.tif"), new Dimension(73, 43)), // Gray 12 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-14.tif"), new Dimension(73, 43)), // Gray 14 bit/sample
                 new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-16.tif"), new Dimension(73, 43)), // Gray 16 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-24.tif"), new Dimension(73, 43)), // Gray 24 bit/sample
                 new TestData(getClassLoaderResource("/tiff/depth/flower-minisblack-32.tif"), new Dimension(73, 43)), // Gray 32 bit/sample
                 // Palette
                 new TestData(getClassLoaderResource("/tiff/depth/flower-palette-02.tif"), new Dimension(73, 43)), // Palette 2 bit/sample
@@ -111,21 +131,47 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
                 new TestData(getClassLoaderResource("/tiff/depth/flower-palette-16.tif"), new Dimension(73, 43)), // Palette 16 bit/sample
                 // RGB Interleaved (PlanarConfiguration: 1)
                 new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-contig-08.tif"), new Dimension(73, 43)), // RGB 8 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-contig-10.tif"), new Dimension(73, 43)), // RGB 10 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-contig-12.tif"), new Dimension(73, 43)), // RGB 12 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-contig-14.tif"), new Dimension(73, 43)), // RGB 14 bit/sample
                 new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-contig-16.tif"), new Dimension(73, 43)), // RGB 16 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-contig-24.tif"), new Dimension(73, 43)), // RGB 24 bit/sample
                 new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-contig-32.tif"), new Dimension(73, 43)), // RGB 32 bit/sample
                 // RGB Planar (PlanarConfiguration: 2)
                 new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-08.tif"), new Dimension(73, 43)), // RGB 8 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-10.tif"), new Dimension(73, 43)), // RGB 10 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-12.tif"), new Dimension(73, 43)), // RGB 12 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-14.tif"), new Dimension(73, 43)), // RGB 14 bit/sample
                 new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-16.tif"), new Dimension(73, 43)), // RGB 16 bit/sample
-                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-32.tif"), new Dimension(73, 43)),  // RGB 32 bit FP samples!
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-24.tif"), new Dimension(73, 43)), // RGB 24 bit/sample
+                // RGB Interleaved Floating point..!? We can read this one, but the samples are not normalized, so colors are way too bright...
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-32.tif"), new Dimension(73, 43)),  // RGB 32 bit FP samples (!)
                 // Separated (CMYK) Interleaved (PlanarConfiguration: 1)
                 new TestData(getClassLoaderResource("/tiff/depth/flower-separated-contig-08.tif"), new Dimension(73, 43)), // CMYK 8 bit/sample
                 new TestData(getClassLoaderResource("/tiff/depth/flower-separated-contig-16.tif"), new Dimension(73, 43)), // CMYK 16 bit/sample
                 // Separated (CMYK) Planar (PlanarConfiguration: 2)
                 new TestData(getClassLoaderResource("/tiff/depth/flower-separated-planar-08.tif"), new Dimension(73, 43)), // CMYK 8 bit/sample
-                new TestData(getClassLoaderResource("/tiff/depth/flower-separated-planar-16.tif"), new Dimension(73, 43))  // CMYK 16 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-separated-planar-16.tif"), new Dimension(73, 43)),  // CMYK 16 bit/sample
+                // JPEG Lossless
+                new TestData(getClassLoaderResource("/tiff/jpeg-lossless-8bit-gray.tif"), new Dimension(512, 512)),  // Lossless JPEG Gray, 8 bit/sample
+                new TestData(getClassLoaderResource("/tiff/jpeg-lossless-12bit-gray.tif"), new Dimension(512, 512)),  // Lossless JPEG Gray, 12 bit/sample
+                new TestData(getClassLoaderResource("/tiff/jpeg-lossless-16bit-gray.tif"), new Dimension(512, 512)),  // Lossless JPEG Gray, 16 bit/sample
+                new TestData(getClassLoaderResource("/tiff/jpeg-lossless-24bit-rgb"), new Dimension(512, 512)),  // Lossless JPEG RGB, 8 bit/sample
+                // Custom PIXTIFF ZIP (Compression: 50013)
+                new TestData(getClassLoaderResource("/tiff/pixtiff/40-8bit-gray-zip.tif"), new Dimension(801, 1313))  // ZIP Gray, 8 bit/sample
         );
     }
 
+    private List<TestData> getUnsupportedTestData() {
+        return Arrays.asList(
+                // RGB Interleaved (PlanarConfiguration: 1)
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-contig-02.tif"), new Dimension(73, 43)), // RGB 2 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-contig-04.tif"), new Dimension(73, 43)), // RGB 4 bit/sample
+                // RGB Planar (PlanarConfiguration: 2)
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-02.tif"), new Dimension(73, 43)), // RGB 2 bit/sample
+                new TestData(getClassLoaderResource("/tiff/depth/flower-rgb-planar-04.tif"), new Dimension(73, 43)) // RGB 4 bit/sample
+        );
+    }
     @Override
     protected ImageReaderSpi createProvider() {
         return SPI;
@@ -195,6 +241,44 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
     }
 
     @Test
+    public void testReadOldStyleJPEGIncorrectJPEGInterchangeFormatLength() throws IOException {
+        TestData testData = new TestData(getClassLoaderResource("/tiff/old-style-jpeg-bogus-jpeginterchangeformatlength.tif"), new Dimension(1632, 2328));
+
+        try (ImageInputStream stream = testData.getInputStream()) {
+            TIFFImageReader reader = createReader();
+            reader.setInput(stream);
+
+            IIOReadWarningListener warningListener = mock(IIOReadWarningListener.class);
+            reader.addIIOReadWarningListener(warningListener);
+
+            BufferedImage image = reader.read(0);
+
+            assertNotNull(image);
+            assertEquals(testData.getDimension(0), new Dimension(image.getWidth(), image.getHeight()));
+            verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), contains("JPEGInterchangeFormatLength"));
+        }
+    }
+
+    @Test
+    public void testReadOldStyleJPEGInconsistentMetadata() throws IOException {
+        TestData testData = new TestData(getClassLoaderResource("/tiff/old-style-jpeg-inconsistent-metadata.tif"), new Dimension(2483, 3515));
+
+        try (ImageInputStream stream = testData.getInputStream()) {
+            TIFFImageReader reader = createReader();
+            reader.setInput(stream);
+
+            IIOReadWarningListener warningListener = mock(IIOReadWarningListener.class);
+            reader.addIIOReadWarningListener(warningListener);
+
+            BufferedImage image = reader.read(0);
+
+            assertNotNull(image);
+            assertEquals(testData.getDimension(0), new Dimension(image.getWidth(), image.getHeight()));
+            verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), contains("JPEG"));
+        }
+    }
+
+    @Test
     public void testReadIncompatibleICCProfileIgnoredWithWarning() throws IOException {
         TestData testData = new TestData(getClassLoaderResource("/tiff/rgb-with-embedded-cmyk-icc.tif"), new Dimension(1500, 1500));
 
@@ -210,6 +294,58 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
             assertNotNull(image);
             assertEquals(testData.getDimension(0), new Dimension(image.getWidth(), image.getHeight()));
             verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), contains("ICC"));
+        }
+    }
+
+    @Test
+    public void testReadYCbCrJPEGAssumedRGB() throws IOException {
+        // Problematic test data, which is YCbCr encoded (as correctly specified by the PhotometricInterpretation tag,
+        // but the JPEGImageReader will detect the data as RGB due to non-subsampled data and SOF ids.
+        TestData testData = new TestData(getClassLoaderResource("/tiff/xerox-jpeg-ycbcr-weird-coefficients.tif"), new Dimension(2482, 3520));
+
+        try (ImageInputStream stream = testData.getInputStream()) {
+            TIFFImageReader reader = createReader();
+            reader.setInput(stream);
+
+            ImageReadParam param = reader.getDefaultReadParam();
+            // TODO: There's a bug in reading with source region for the raster case...
+//            param.setSourceRegion(new Rectangle(8, 8));
+            BufferedImage image = reader.read(0, param);
+
+            assertNotNull(image);
+//            assertEquals(new Dimension(8, 8), new Dimension(image.getWidth(), image.getHeight()));
+            assertEquals(testData.getDimension(0), new Dimension(image.getWidth(), image.getHeight()));
+
+            // The pixel at 0, 0 should be white(-ish), not red!
+            // NOTE: The image contains some weird custom YCbCr coefficients, which are roughly
+            // 0.299, 0.587, 0.144, instead of the standard 0.299, 0.587, 0.114 (the last/blue coefficient differs)
+            // this will make the background bright purple, rather than pure white as it would have been
+            // with standard coefficients. Could be a typo/bug in the encoder or intentional.
+            // Some/most software ignores the custom coefficients, and decodes the image as white background...
+            int argb = image.getRGB(0, 0);
+            assertEquals("Alpha", 0xff, (argb >>> 24) & 0xff);
+            assertEquals("Red", 0xff, (argb >> 16) & 0xff);
+            assertEquals("Green", 0xf2, (argb >> 8) & 0xff);
+            assertEquals("Blue", 0xff, argb & 0xff);
+        }
+    }
+
+    @Test
+    public void testReadJPEGRasterCaseWithSrcRegion() throws IOException {
+        // Problematic test data, which is YCbCr encoded (as correctly specified by the PhotometricInterpretation tag,
+        // but the JPEGImageReader will detect the data as RGB due to non-subsampled data and SOF ids.
+        TestData testData = new TestData(getClassLoaderResource("/tiff/xerox-jpeg-ycbcr-weird-coefficients.tif"), new Dimension(2482, 3520));
+
+        try (ImageInputStream stream = testData.getInputStream()) {
+            TIFFImageReader reader = createReader();
+            reader.setInput(stream);
+
+            ImageReadParam param = reader.getDefaultReadParam();
+            param.setSourceRegion(new Rectangle(8, 8));
+            BufferedImage image = reader.read(0, param);
+
+            assertNotNull(image);
+            assertEquals(new Dimension(8, 8), new Dimension(image.getWidth(), image.getHeight()));
         }
     }
 
@@ -328,4 +464,203 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
         }
     }
 
+    @Test
+    public void testPhotometricInterpretationFallback() throws IOException {
+        String[] files = {
+                "/tiff/guessPhotometric/group4.tif",
+                "/tiff/guessPhotometric/flower-rgb-contig-08.tif",
+                "/tiff/guessPhotometric/flower-separated-planar-08.tif"
+        };
+
+        final int[] results = {
+                TIFFBaseline.PHOTOMETRIC_WHITE_IS_ZERO,
+                TIFFBaseline.PHOTOMETRIC_RGB,
+                TIFFExtension.PHOTOMETRIC_SEPARATED
+        };
+
+        for (int i = 0; i < files.length; i++) {
+            final AtomicBoolean foundWarning = new AtomicBoolean(false);
+            final int expectedResult = results[i];
+
+            try (ImageInputStream iis = ImageIO.createImageInputStream(getClassLoaderResource(files[i]))) {
+                TIFFImageReader reader = createReader();
+
+                reader.setInput(iis);
+                reader.addIIOReadWarningListener(new IIOReadWarningListener() {
+                    @Override
+                    public void warningOccurred(ImageReader source, String warning) {
+                        if (warning.equals("Missing PhotometricInterpretation, determining fallback: " + expectedResult)) {
+                            foundWarning.set(true);
+                        }
+                    }
+                });
+                reader.read(0);
+            }
+            assertTrue("no correct guess for PhotometricInterpretation: " + results[i], foundWarning.get());
+        }
+    }
+
+    @Test
+    public void testReadWithSubsampleParamPixelsJPEG() throws IOException {
+        // Tiled "new style" JPEG
+        ImageReader reader = createReader();
+        TestData data = new TestData(getClassLoaderResource("/tiff/quad-jpeg.tif"), new Dimension(512, 384));
+        reader.setInput(data.getInputStream());
+
+        ImageReadParam param = reader.getDefaultReadParam();
+
+        BufferedImage image = null;
+        BufferedImage subsampled = null;
+        try {
+            image = reader.read(0, param);
+
+            param.setSourceSubsampling(2, 2, 0, 0);
+            subsampled = reader.read(0, param);
+        }
+        catch (IOException e) {
+            failBecause("Image could not be read", e);
+        }
+
+        assertSubsampledImageDataEquals("Subsampled image data does not match expected", image, subsampled, param);
+    }
+
+    @Test
+    public void testReadWithSubsampleParamPixelsOldJPEG() throws IOException {
+        ImageReader reader = createReader();
+        TestData data = new TestData(getClassLoaderResource("/tiff/smallliz.tif"), new Dimension(160, 160));
+        reader.setInput(data.getInputStream());
+
+        ImageReadParam param = reader.getDefaultReadParam();
+
+        BufferedImage image = null;
+        BufferedImage subsampled = null;
+        try {
+            image = reader.read(0, param);
+
+            param.setSourceSubsampling(2, 2, 0, 0);
+            subsampled = reader.read(0, param);
+        }
+        catch (IOException e) {
+            failBecause("Image could not be read", e);
+        }
+
+        assertSubsampledImageDataEquals("Subsampled image data does not match expected", image, subsampled, param);
+    }
+
+    @Test
+    public void testReadWithSubsampleParamPixelsTiled() throws IOException {
+        ImageReader reader = createReader();
+        TestData data = new TestData(getClassLoaderResource("/tiff/cramps-tile.tif"), new Dimension(800, 607));
+        reader.setInput(data.getInputStream());
+
+        ImageReadParam param = reader.getDefaultReadParam();
+
+        BufferedImage image = null;
+        BufferedImage subsampled = null;
+        try {
+            image = reader.read(0, param);
+
+            param.setSourceSubsampling(2, 2, 0, 0);
+            subsampled = reader.read(0, param);
+        }
+        catch (IOException e) {
+            failBecause("Image could not be read", e);
+        }
+
+        assertSubsampledImageDataEquals("Subsampled image data does not match expected", image, subsampled, param);
+    }
+
+    @Test
+    public void testReadUnsupported() {
+        ImageReader reader = createReader();
+
+        for (TestData data : getUnsupportedTestData()) {
+            reader.setInput(data.getInputStream());
+
+            for (int i = 0; i < data.getImageCount(); i++) {
+                try {
+                    reader.read(i);
+                    fail("Sample should be moved from unsupported to normal test case");
+                }
+                catch (IIOException e) {
+                    assertThat(e.getMessage().toLowerCase(), containsString("unsupported"));
+                }
+                catch (Exception e) {
+                    failBecause(String.format("Image %s index %s could not be read: %s", data.getInput(), i, e), e);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testStreamMetadataNonNull() {
+        ImageReader reader = createReader();
+
+        for (TestData data : getTestData()) {
+            reader.setInput(data.getInputStream());
+
+            try {
+                IIOMetadata streamMetadata = reader.getStreamMetadata();
+                assertNotNull(streamMetadata);
+                assertThat(streamMetadata, is(TIFFStreamMetadata.class));
+            }
+            catch (Exception e) {
+                failBecause(String.format("Image %s could not be read: %s", data.getInput(), e), e);
+            }
+        }
+    }
+
+    @Test
+    public void testStreamMetadataII() throws IOException {
+        ImageReader reader = createReader();
+
+        try (ImageInputStream stream = ImageIO.createImageInputStream(getClassLoaderResource("/tiff/ccitt_tolessrows.tif"))) {
+            reader.setInput(stream);
+            TIFFStreamMetadata streamMetadata = (TIFFStreamMetadata) reader.getStreamMetadata();
+            assertEquals(ByteOrder.LITTLE_ENDIAN, streamMetadata.byteOrder);
+        }
+    }
+
+    @Test
+    public void testStreamMetadataMM() throws IOException {
+        ImageReader reader = createReader();
+
+        try (ImageInputStream stream = ImageIO.createImageInputStream(getClassLoaderResource("/tiff/sm_colors_pb.tif"))) {
+            reader.setInput(stream);
+            TIFFStreamMetadata streamMetadata = (TIFFStreamMetadata) reader.getStreamMetadata();
+            assertEquals(ByteOrder.BIG_ENDIAN, streamMetadata.byteOrder);
+        }
+    }
+
+    @Test
+    public void testReadRaster() {
+        ImageReader reader = createReader();
+
+        for (TestData data : getTestData()) {
+            reader.setInput(data.getInputStream());
+
+            for (int i = 0; i < data.getImageCount(); i++) {
+                Raster raster = null;
+
+                try {
+                    raster = reader.readRaster(i, null);
+                }
+                catch (Exception e) {
+                    failBecause(String.format("Image %s index %s could not be read: %s", data.getInput(), i, e), e);
+                }
+
+                assertNotNull(String.format("Raster %s index %s was null!", data.getInput(), i), raster);
+
+                assertEquals(
+                        String.format("Raster %s index %s has wrong width: %s", data.getInput(), i, raster.getWidth()),
+                        data.getDimension(i).width,
+                        raster.getWidth()
+                );
+                assertEquals(
+                        String.format("Raster %s index %s has wrong height: %s", data.getInput(), i, raster.getHeight()),
+                        data.getDimension(i).height, raster.getHeight()
+                );
+            }
+        }
+    }
 }

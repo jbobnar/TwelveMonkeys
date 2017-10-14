@@ -28,37 +28,23 @@
 
 package com.twelvemonkeys.imageio.plugins.jpeg;
 
-import java.awt.Rectangle;
-import java.awt.color.ColorSpace;
-import java.awt.color.ICC_ColorSpace;
-import java.awt.color.ICC_Profile;
-import java.awt.image.BufferedImage;
-import java.awt.image.ColorConvertOp;
-import java.awt.image.DataBuffer;
-import java.awt.image.DataBufferByte;
-import java.awt.image.Raster;
-import java.awt.image.RasterOp;
-import java.awt.image.RenderedImage;
-import java.awt.image.WritableRaster;
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.SequenceInputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import com.twelvemonkeys.imageio.ImageReaderBase;
+import com.twelvemonkeys.imageio.color.ColorSpaces;
+import com.twelvemonkeys.imageio.color.YCbCrConverter;
+import com.twelvemonkeys.imageio.metadata.CompoundDirectory;
+import com.twelvemonkeys.imageio.metadata.Directory;
+import com.twelvemonkeys.imageio.metadata.Entry;
+import com.twelvemonkeys.imageio.metadata.jpeg.JPEG;
+import com.twelvemonkeys.imageio.metadata.jpeg.JPEGSegment;
+import com.twelvemonkeys.imageio.metadata.jpeg.JPEGSegmentUtil;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFF;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFFReader;
+import com.twelvemonkeys.imageio.util.ImageTypeSpecifiers;
+import com.twelvemonkeys.imageio.util.ProgressListenerBase;
+import com.twelvemonkeys.lang.Validate;
+import com.twelvemonkeys.xml.XMLSerializer;
 
-import javax.imageio.IIOException;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReadParam;
-import javax.imageio.ImageReader;
-import javax.imageio.ImageTypeSpecifier;
+import javax.imageio.*;
 import javax.imageio.event.IIOReadUpdateListener;
 import javax.imageio.event.IIOReadWarningListener;
 import javax.imageio.metadata.IIOMetadata;
@@ -67,22 +53,14 @@ import javax.imageio.metadata.IIOMetadataNode;
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.MemoryCacheImageInputStream;
-
-import com.twelvemonkeys.imageio.ImageReaderBase;
-import com.twelvemonkeys.imageio.color.ColorSpaces;
-import com.twelvemonkeys.imageio.color.YCbCrConverter;
-import com.twelvemonkeys.imageio.metadata.CompoundDirectory;
-import com.twelvemonkeys.imageio.metadata.Directory;
-import com.twelvemonkeys.imageio.metadata.Entry;
-import com.twelvemonkeys.imageio.metadata.exif.EXIFReader;
-import com.twelvemonkeys.imageio.metadata.exif.TIFF;
-import com.twelvemonkeys.imageio.metadata.jpeg.JPEG;
-import com.twelvemonkeys.imageio.metadata.jpeg.JPEGSegment;
-import com.twelvemonkeys.imageio.metadata.jpeg.JPEGSegmentUtil;
-import com.twelvemonkeys.imageio.util.ImageTypeSpecifiers;
-import com.twelvemonkeys.imageio.util.ProgressListenerBase;
-import com.twelvemonkeys.lang.Validate;
-import com.twelvemonkeys.xml.XMLSerializer;
+import java.awt.*;
+import java.awt.color.ColorSpace;
+import java.awt.color.ICC_ColorSpace;
+import java.awt.color.ICC_Profile;
+import java.awt.image.*;
+import java.io.*;
+import java.util.*;
+import java.util.List;
 
 /**
  * A JPEG {@code ImageReader} implementation based on the JRE {@code JPEGImageReader},
@@ -120,7 +98,7 @@ import com.twelvemonkeys.xml.XMLSerializer;
  * @author last modified by $Author: haraldk$
  * @version $Id: JPEGImageReader.java,v 1.0 24.01.11 16.37 haraldk Exp$
  */
-public class JPEGImageReader extends ImageReaderBase {
+public final class JPEGImageReader extends ImageReaderBase {
     // TODO: Allow automatic rotation based on EXIF rotation field?
     // TODO: Create a simplified native metadata format that is closer to the actual JPEG stream AND supports EXIF in a sensible way
     // TODO: As we already parse the SOF segments, maybe we should stop delegating getWidth/getHeight etc?
@@ -131,33 +109,7 @@ public class JPEGImageReader extends ImageReaderBase {
     static final int ALL_APP_MARKERS = -1;
 
     /** Segment identifiers for the JPEG segments we care about reading. */
-    private static final Map<Integer, List<String>> SEGMENT_IDENTIFIERS = createSegmentIds();
-
-    private static Map<Integer, List<String>> createSegmentIds() {
-        Map<Integer, List<String>> map = new LinkedHashMap<>();
-
-        // Need all APP markers to be able to re-generate proper metadata later
-        for (int appMarker = JPEG.APP0; appMarker <= JPEG.APP15; appMarker++) {
-            map.put(appMarker, JPEGSegmentUtil.ALL_IDS);
-        }
-
-        // SOFn markers
-        map.put(JPEG.SOF0, null);
-        map.put(JPEG.SOF1, null);
-        map.put(JPEG.SOF2, null);
-        map.put(JPEG.SOF3, null);
-        map.put(JPEG.SOF5, null);
-        map.put(JPEG.SOF6, null);
-        map.put(JPEG.SOF7, null);
-        map.put(JPEG.SOF9, null);
-        map.put(JPEG.SOF10, null);
-        map.put(JPEG.SOF11, null);
-        map.put(JPEG.SOF13, null);
-        map.put(JPEG.SOF14, null);
-        map.put(JPEG.SOF15, null);
-
-        return Collections.unmodifiableMap(map);
-    }
+    private static final Map<Integer, List<String>> SEGMENT_IDENTIFIERS = JPEGSegmentUtil.ALL_SEGMENTS;
 
     /** Our JPEG reading delegate */
     private final ImageReader delegate;
@@ -172,7 +124,7 @@ public class JPEGImageReader extends ImageReaderBase {
     private JPEGImage10MetadataCleaner metadataCleaner;
 
     /** Cached list of JPEG segments we filter from the underlying stream */
-    private List<JPEGSegment> segments;
+    private List<Segment> segments;
 
     protected JPEGImageReader(final ImageReaderSpi provider, final ImageReader delegate) {
         super(provider);
@@ -221,6 +173,12 @@ public class JPEGImageReader extends ImageReaderBase {
 
     @Override
     public int getNumImages(boolean allowSearch) throws IOException {
+        if (allowSearch) {
+            if (isLossless()) {
+                return 1;
+            }
+        }
+
         try {
             return delegate.getNumImages(allowSearch);
         }
@@ -230,13 +188,46 @@ public class JPEGImageReader extends ImageReaderBase {
         }
     }
 
+    private boolean isLossless() throws IOException {
+        assertInput();
+
+        try {
+            Frame sof = getSOF();
+            if (sof.marker == JPEG.SOF3) {
+                return true;
+            }
+        }
+        catch (IIOException ignore) {
+            // May happen if no SOF is found, in case we'll just fall through
+            if (DEBUG) {
+                ignore.printStackTrace();
+            }
+        }
+
+        return false;
+    }
+
     @Override
     public int getWidth(int imageIndex) throws IOException {
+        checkBounds(imageIndex);
+
+        Frame sof = getSOF();
+        if (sof.marker == JPEG.SOF3) {
+            return sof.samplesPerLine;
+        }
+
         return delegate.getWidth(imageIndex);
     }
 
     @Override
     public int getHeight(int imageIndex) throws IOException {
+        checkBounds(imageIndex);
+
+        Frame sof = getSOF();
+        if (sof.marker == JPEG.SOF3) {
+            return sof.lines;
+        }
+
         return delegate.getHeight(imageIndex);
     }
 
@@ -297,7 +288,7 @@ public class JPEGImageReader extends ImageReaderBase {
                 return rawType;
             }
         }
-        catch (NullPointerException ignore) {
+        catch (IIOException | NullPointerException ignore) {
             // Fall through
         }
 
@@ -340,17 +331,17 @@ public class JPEGImageReader extends ImageReaderBase {
         assertInput();
         checkBounds(imageIndex);
 
-        SOFSegment sof = getSOF();
+        Frame sof = getSOF();
         ICC_Profile profile = getEmbeddedICCProfile(false);
-        AdobeDCTSegment adobeDCT = getAdobeDCT();
+        AdobeDCT adobeDCT = getAdobeDCT();
         boolean bogusAdobeDCT = false;
 
-        if (adobeDCT != null && (adobeDCT.getTransform() == AdobeDCTSegment.YCC && sof.componentsInFrame() != 3 ||
-                adobeDCT.getTransform() == AdobeDCTSegment.YCCK && sof.componentsInFrame() != 4)) {
+        if (adobeDCT != null && (adobeDCT.transform == AdobeDCT.YCC && sof.componentsInFrame() != 3 ||
+                adobeDCT.transform == AdobeDCT.YCCK && sof.componentsInFrame() != 4)) {
             processWarningOccurred(String.format(
                     "Invalid Adobe App14 marker. Indicates %s data, but SOF%d has %d color component(s). " +
                             "Ignoring Adobe App14 marker.",
-                    adobeDCT.getTransform() == AdobeDCTSegment.YCCK ? "YCCK/CMYK" : "YCC/RGB",
+                    adobeDCT.transform == AdobeDCT.YCCK ? "YCCK/CMYK" : "YCC/RGB",
                     sof.marker & 0xf, sof.componentsInFrame()
             ));
 
@@ -360,13 +351,36 @@ public class JPEGImageReader extends ImageReaderBase {
 
         JPEGColorSpace sourceCSType = getSourceCSType(getJFIF(), adobeDCT, sof);
 
+        if (sof.marker == JPEG.SOF3) {
+            // Read image as lossless
+            if (DEBUG) {
+                System.out.println("Reading using Lossless decoder");
+            }
+
+            // TODO: What about stream position?
+            // TODO: Param handling: Source region, offset, subsampling, destination, destination type, etc....
+            BufferedImage bufferedImage = new JPEGLosslessDecoderWrapper(this).readImage(segments, imageInput);
+
+            // TODO: This is QnD, move param handling to lossless wrapper
+            // TODO: Create test!
+            BufferedImage destination = param != null ? param.getDestination() : null;
+            if (destination != null) {
+                destination.getRaster().setDataElements(0, 0, bufferedImage.getRaster());
+                return destination;
+            }
+
+            return bufferedImage;
+        }
+        
         // We need to apply ICC profile unless the profile is sRGB/default gray (whatever that is)
         // - or only filter out the bad ICC profiles in the JPEGSegmentImageInputStream.
-        if (delegate.canReadRaster() && (
+        else if (delegate.canReadRaster() && (
                 bogusAdobeDCT ||
                 sourceCSType == JPEGColorSpace.CMYK ||
                 sourceCSType == JPEGColorSpace.YCCK ||
                 profile != null && !ColorSpaces.isCS_sRGB(profile) ||
+                (long) sof.lines * sof.samplesPerLine > Integer.MAX_VALUE ||
+                !delegate.getImageTypes(imageIndex).hasNext() ||
                 sourceCSType == JPEGColorSpace.YCbCr && getRawImageType(imageIndex) != null)) { // TODO: Issue warning?
             if (DEBUG) {
                 System.out.println("Reading using raster and extra conversion");
@@ -374,7 +388,7 @@ public class JPEGImageReader extends ImageReaderBase {
             }
 
             // TODO: Possible to optimize slightly, to avoid readAsRaster for non-CMYK and other good types?
-            return readImageAsRasterAndReplaceColorProfile(imageIndex, param, sof, sourceCSType, ensureDisplayProfile(profile));
+            return readImageAsRasterAndReplaceColorProfile(imageIndex, param, sof, sourceCSType, profile);
         }
 
         if (DEBUG) {
@@ -384,7 +398,7 @@ public class JPEGImageReader extends ImageReaderBase {
         return delegate.read(imageIndex, param);
     }
 
-    private BufferedImage readImageAsRasterAndReplaceColorProfile(int imageIndex, ImageReadParam param, SOFSegment startOfFrame, JPEGColorSpace csType, ICC_Profile profile) throws IOException {
+    private BufferedImage readImageAsRasterAndReplaceColorProfile(int imageIndex, ImageReadParam param, Frame startOfFrame, JPEGColorSpace csType, ICC_Profile profile) throws IOException {
         int origWidth = getWidth(imageIndex);
         int origHeight = getHeight(imageIndex);
 
@@ -440,7 +454,10 @@ public class JPEGImageReader extends ImageReaderBase {
                                 "Colors may look incorrect."
                 );
 
-                convert = new ColorConvertOp(cmykCS, image.getColorModel().getColorSpace(), null);
+                // NOTE: Avoid using CCOp if same color space, as it's more compatible that way
+                if (cmykCS != image.getColorModel().getColorSpace()) {
+                    convert = new ColorConvertOp(cmykCS, image.getColorModel().getColorSpace(), null);
+                }
             }
             else {
                 // ColorConvertOp using non-ICC CS is deadly slow, fall back to fast conversion instead
@@ -484,8 +501,11 @@ public class JPEGImageReader extends ImageReaderBase {
             Raster raster = delegate.readRaster(imageIndex, param); // non-converted
 
             // Apply source color conversion from implicit color space
-            if (csType == JPEGColorSpace.YCbCr || csType == JPEGColorSpace.YCbCrA) {
-                convertYCbCr2RGB(raster);
+            if (csType == JPEGColorSpace.YCbCr) {
+                convertYCbCr2RGB(raster, 3);
+            }
+            else if (csType == JPEGColorSpace.YCbCrA) {
+                convertYCbCr2RGB(raster, 4);
             }
             else if (csType == JPEGColorSpace.YCCK) {
                 // TODO: Need to rethink this (non-) inversion, see #147
@@ -516,7 +536,7 @@ public class JPEGImageReader extends ImageReaderBase {
         return image;
     }
 
-    static JPEGColorSpace getSourceCSType(JFIFSegment jfif, AdobeDCTSegment adobeDCT, final SOFSegment startOfFrame) throws IIOException {
+    static JPEGColorSpace getSourceCSType(JFIF jfif, AdobeDCT adobeDCT, final Frame startOfFrame) throws IIOException {
         /*
         ADAPTED from http://download.oracle.com/javase/6/docs/api/javax/imageio/metadata/doc-files/jpeg_metadata.html:
 
@@ -558,27 +578,27 @@ public class JPEGImageReader extends ImageReaderBase {
         */
 
         if (adobeDCT != null) {
-            switch (adobeDCT.getTransform()) {
-                case AdobeDCTSegment.YCC:
-                    if (startOfFrame.components.length != 3) {
+            switch (adobeDCT.transform) {
+                case AdobeDCT.YCC:
+                    if (startOfFrame.componentsInFrame() != 3) {
                         // This probably means the Adobe marker is bogus
                         break;
                     }
                     return JPEGColorSpace.YCbCr;
-                case AdobeDCTSegment.YCCK:
-                    if (startOfFrame.components.length != 4) {
+                case AdobeDCT.YCCK:
+                    if (startOfFrame.componentsInFrame() != 4) {
                         // This probably means the Adobe marker is bogus
                         break;
                     }
                     return JPEGColorSpace.YCCK;
-                case AdobeDCTSegment.Unknown:
-                    if (startOfFrame.components.length == 1) {
+                case AdobeDCT.Unknown:
+                    if (startOfFrame.componentsInFrame() == 1) {
                         return JPEGColorSpace.Gray;
                     }
-                    else if (startOfFrame.components.length == 3) {
+                    else if (startOfFrame.componentsInFrame() == 3) {
                         return JPEGColorSpace.RGB;
                     }
-                    else if (startOfFrame.components.length == 4) {
+                    else if (startOfFrame.componentsInFrame() == 4) {
                         return JPEGColorSpace.CMYK;
                     }
                     // Else fall through
@@ -587,7 +607,7 @@ public class JPEGImageReader extends ImageReaderBase {
         }
 
         // TODO: We should probably allow component ids out of order (ie. BGR or KMCY)...
-        switch (startOfFrame.components.length) {
+        switch (startOfFrame.componentsInFrame()) {
             case 1:
                 return JPEGColorSpace.Gray;
             case 2:
@@ -605,7 +625,7 @@ public class JPEGImageReader extends ImageReaderBase {
                 }
                 else {
                     // If subsampled, YCbCr else RGB
-                    for (SOFComponent component : startOfFrame.components) {
+                    for (Frame.Component component : startOfFrame.components) {
                         if (component.hSub != 1 || component.vSub != 1) {
                             return JPEGColorSpace.YCbCr;
                         }
@@ -633,7 +653,7 @@ public class JPEGImageReader extends ImageReaderBase {
                 else {
                     // TODO: JPEGMetadata (standard format) will report YCbCrA for 4 channel subsampled... :-/
                     // If subsampled, YCCK else CMYK
-                    for (SOFComponent component : startOfFrame.components) {
+                    for (Frame.Component component : startOfFrame.components) {
                         if (component.hSub != 1 || component.vSub != 1) {
                             return JPEGColorSpace.YCCK;
                         }
@@ -680,7 +700,27 @@ public class JPEGImageReader extends ImageReaderBase {
         if (segments == null) {
             long start = DEBUG ? System.currentTimeMillis() : 0;
 
-            readSegments();
+            // TODO: Consider just reading the segments directly, for better performance...
+            List<JPEGSegment> jpegSegments = readSegments();
+
+            List<Segment> segments = new ArrayList<>(jpegSegments.size());
+
+            for (JPEGSegment segment : jpegSegments) {
+                try (DataInputStream data = new DataInputStream(segment.segmentData())) {
+                    segments.add(Segment.read(segment.marker(), segment.identifier(), segment.segmentLength(), data));
+                }
+                catch (IOException e) {
+                    // TODO: Handle bad segments better, for now, just ignore any bad APP markers
+                    if (segment.marker() >= JPEG.APP0 && JPEG.APP15 >= segment.marker()) {
+                        processWarningOccurred("Bogus APP" + (segment.marker() & 0x0f) + "/" + segment.identifier() + " segment, ignoring");
+                        continue;
+                    }
+
+                    throw e;
+                }
+            }
+
+            this.segments = segments;
 
             if (DEBUG) {
                 System.out.println("Read metadata in " + (System.currentTimeMillis() - start) + " ms");
@@ -688,13 +728,13 @@ public class JPEGImageReader extends ImageReaderBase {
         }
     }
 
-    private void readSegments() throws IOException {
+    private List<JPEGSegment> readSegments() throws IOException {
         imageInput.mark();
 
         try {
             imageInput.seek(0); // TODO: Seek to wanted image, skip images on the way
 
-            segments = JPEGSegmentUtil.readSegments(imageInput, SEGMENT_IDENTIFIERS);
+            return JPEGSegmentUtil.readSegments(imageInput, SEGMENT_IDENTIFIERS);
         }
         catch (IIOException | IllegalArgumentException ignore) {
             if (DEBUG) {
@@ -706,125 +746,62 @@ public class JPEGImageReader extends ImageReaderBase {
         }
 
         // In case of an exception, avoid NPE when referencing segments later
-        if (segments == null) {
-            segments = Collections.emptyList();
-        }
+        return Collections.emptyList();
     }
 
-    List<JPEGSegment> getAppSegments(final int marker, final String identifier) throws IOException {
+    List<Application> getAppSegments(final int marker, final String identifier) throws IOException {
         initHeader();
 
-        List<JPEGSegment> appSegments = Collections.emptyList();
+        List<Application> appSegments = Collections.emptyList();
 
-        for (JPEGSegment segment : segments) {
-            if ((marker == ALL_APP_MARKERS && segment.marker() >= JPEG.APP0 && segment.marker() <= JPEG.APP15 || segment.marker() == marker)
-                    && (identifier == null || identifier.equals(segment.identifier()))) {
+        for (Segment segment : segments) {
+            if (segment instanceof Application
+                    && (marker == ALL_APP_MARKERS || marker == segment.marker)
+                    && (identifier == null || identifier.equals(((Application) segment).identifier))) {
                 if (appSegments == Collections.EMPTY_LIST) {
                     appSegments = new ArrayList<>(segments.size());
                 }
 
-                appSegments.add(segment);
+                appSegments.add((Application) segment);
             }
         }
 
         return appSegments;
     }
 
-    SOFSegment getSOF() throws IOException {
+    Frame getSOF() throws IOException {
         initHeader();
 
-        for (JPEGSegment segment : segments) {
-            if (JPEG.SOF0 >= segment.marker() && segment.marker() <= JPEG.SOF3 ||
-                    JPEG.SOF5 >= segment.marker() && segment.marker() <= JPEG.SOF7 ||
-                    JPEG.SOF9 >= segment.marker() && segment.marker() <= JPEG.SOF11 ||
-                    JPEG.SOF13 >= segment.marker() && segment.marker() <= JPEG.SOF15) {
-
-                DataInputStream data = new DataInputStream(segment.data());
-
-                try {
-                    int samplePrecision = data.readUnsignedByte();
-                    int lines = data.readUnsignedShort();
-                    int samplesPerLine = data.readUnsignedShort();
-                    int componentsInFrame = data.readUnsignedByte();
-
-                    SOFComponent[] components = new SOFComponent[componentsInFrame];
-
-                    for (int i = 0; i < componentsInFrame; i++) {
-                        int id = data.readUnsignedByte();
-                        int sub = data.readUnsignedByte();
-                        int qtSel = data.readUnsignedByte();
-
-                        components[i] = new SOFComponent(id, ((sub & 0xF0) >> 4), (sub & 0xF), qtSel);
-                    }
-
-                    return new SOFSegment(segment.marker(), samplePrecision, lines, samplesPerLine, components);
-                }
-                finally {
-                    data.close();
-                }
+        for (Segment segment : segments) {
+            if (segment instanceof Frame) {
+                return (Frame) segment;
             }
         }
 
         throw new IIOException("No SOF segment in stream");
     }
 
-    AdobeDCTSegment getAdobeDCT() throws IOException {
-        // TODO: Investigate http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6355567: 33/35 byte Adobe APP14 markers
-        List<JPEGSegment> adobe = getAppSegments(JPEG.APP14, "Adobe");
-
-        if (!adobe.isEmpty()) {
-            // version (byte), flags (4bytes), color transform (byte: 0=unknown, 1=YCC, 2=YCCK)
-            DataInputStream stream = new DataInputStream(adobe.get(0).data());
-
-            return new AdobeDCTSegment(
-                    stream.readUnsignedByte(),
-                    stream.readUnsignedShort(),
-                    stream.readUnsignedShort(),
-                    stream.readUnsignedByte()
-            );
-        }
-
-        return null;
+    AdobeDCT getAdobeDCT() throws IOException {
+        List<Application> adobe = getAppSegments(JPEG.APP14, "Adobe");
+        return adobe.isEmpty() ? null : (AdobeDCT) adobe.get(0);
     }
 
-    JFIFSegment getJFIF() throws IOException{
-        List<JPEGSegment> jfif = getAppSegments(JPEG.APP0, "JFIF");
+    JFIF getJFIF() throws IOException{
+        List<Application> jfif = getAppSegments(JPEG.APP0, "JFIF");
+        return jfif.isEmpty() ? null : (JFIF) jfif.get(0);
 
-        if (!jfif.isEmpty()) {
-            JPEGSegment segment = jfif.get(0);
-
-            if (segment.length() >= 9) {
-                return JFIFSegment.read(segment.data());
-            }
-            else {
-                processWarningOccurred("Bogus JFIF segment, ignoring");
-            }
-        }
-
-        return null;
     }
 
-    JFXXSegment getJFXX() throws IOException {
-        List<JPEGSegment> jfxx = getAppSegments(JPEG.APP0, "JFXX");
-
-        if (!jfxx.isEmpty()) {
-            JPEGSegment segment = jfxx.get(0);
-            if (segment.length() >= 1) {
-                return JFXXSegment.read(segment.data(), segment.length());
-            }
-            else {
-                processWarningOccurred("Bogus JFXX segment, ignoring");
-            }
-        }
-
-        return null;
+    JFXX getJFXX() throws IOException {
+        List<Application> jfxx = getAppSegments(JPEG.APP0, "JFXX");
+        return jfxx.isEmpty() ? null : (JFXX) jfxx.get(0);
     }
 
     private CompoundDirectory getExif() throws IOException {
-        List<JPEGSegment> exifSegments = getAppSegments(JPEG.APP1, "Exif");
+        List<Application> exifSegments = getAppSegments(JPEG.APP1, "Exif");
 
         if (!exifSegments.isEmpty()) {
-            JPEGSegment exif = exifSegments.get(0);
+            Application exif = exifSegments.get(0);
             InputStream data = exif.data();
 
             if (data.read() == -1) { // Read pad
@@ -832,9 +809,9 @@ public class JPEGImageReader extends ImageReaderBase {
             }
             else {
                 ImageInputStream stream = ImageIO.createImageInputStream(data);
-                return (CompoundDirectory) new EXIFReader().read(stream);
+                return (CompoundDirectory) new TIFFReader().read(stream);
 
-                // TODO: Directory offset of thumbnail is wrong/relative to container stream, causing trouble for the EXIFReader...
+                // TODO: Directory offset of thumbnail is wrong/relative to container stream, causing trouble for the TIFFReader...
             }
         }
 
@@ -859,14 +836,14 @@ public class JPEGImageReader extends ImageReaderBase {
 
         // TODO: Allow metadata to contain the wrongly indexed profiles, if readable
         // NOTE: We ignore any profile with wrong index for reading and image types, just to be on the safe side
-        if (!Boolean.parseBoolean(System.getProperty("doColorManagement", "true"))) {
-            return null;
-        }
-        List<JPEGSegment> segments = getAppSegments(JPEG.APP2, "ICC_PROFILE");
+
+        List<Application> segments = getAppSegments(JPEG.APP2, "ICC_PROFILE");
+
+        // TODO: Possibly move this logic to the ICCProfile class...
 
         if (segments.size() == 1) {
             // Faster code for the common case
-            JPEGSegment segment = segments.get(0);
+            Application segment = segments.get(0);
             DataInputStream stream = new DataInputStream(segment.data());
             int chunkNumber = stream.readUnsignedByte();
             int chunkCount = stream.readUnsignedByte();
@@ -933,7 +910,8 @@ public class JPEGImageReader extends ImageReaderBase {
         try {
             ICC_Profile profile = ICC_Profile.getInstance(stream);
 
-            return allowBadProfile ? profile : ColorSpaces.validateProfile(profile);
+            // NOTE: Need to ensure we have a display profile *before* validating, for the caching to work
+            return allowBadProfile ? profile : ColorSpaces.validateProfile(ensureDisplayProfile(profile));
         }
         catch (RuntimeException e) {
             // NOTE: Throws either IllegalArgumentException or CMMException, depending on platform.
@@ -949,7 +927,15 @@ public class JPEGImageReader extends ImageReaderBase {
     }
 
     @Override
-    public Raster readRaster(int imageIndex, ImageReadParam param) throws IOException {
+    public Raster readRaster(final int imageIndex, final ImageReadParam param) throws IOException {
+        checkBounds(imageIndex);
+
+        if (isLossless()) {
+            // TODO: What about stream position?
+            // TODO: Param handling: Reading as raster should support source region, subsampling etc.
+            return new JPEGLosslessDecoderWrapper(this).readRaster(segments, imageInput);
+        }
+
         return delegate.readRaster(imageIndex, param);
     }
 
@@ -983,18 +969,18 @@ public class JPEGImageReader extends ImageReaderBase {
             ThumbnailReadProgressListener thumbnailProgressDelegator = new ThumbnailProgressDelegate();
 
             // Read JFIF thumbnails if present
-            JFIFSegment jfif = getJFIF();
+            JFIF jfif = getJFIF();
             if (jfif != null && jfif.thumbnail != null) {
                 thumbnails.add(new JFIFThumbnailReader(thumbnailProgressDelegator, imageIndex, thumbnails.size(), jfif));
             }
 
             // Read JFXX thumbnails if present
-            JFXXSegment jfxx = getJFXX();
+            JFXX jfxx = getJFXX();
             if (jfxx != null && jfxx.thumbnail != null) {
                 switch (jfxx.extensionCode) {
-                    case JFXXSegment.JPEG:
-                    case JFXXSegment.INDEXED:
-                    case JFXXSegment.RGB:
+                    case JFXX.JPEG:
+                    case JFXX.INDEXED:
+                    case JFXX.RGB:
                         thumbnails.add(new JFXXThumbnailReader(thumbnailProgressDelegator, getThumbnailReader(), imageIndex, thumbnails.size(), jfxx));
                         break;
                     default:
@@ -1003,9 +989,9 @@ public class JPEGImageReader extends ImageReaderBase {
             }
 
             // Read Exif thumbnails if present
-            List<JPEGSegment> exifSegments = getAppSegments(JPEG.APP1, "Exif");
+            List<Application> exifSegments = getAppSegments(JPEG.APP1, "Exif");
             if (!exifSegments.isEmpty()) {
-                JPEGSegment exif = exifSegments.get(0);
+                Application exif = exifSegments.get(0);
                 InputStream data = exif.data();
 
                 if (data.read() == -1) {
@@ -1014,25 +1000,40 @@ public class JPEGImageReader extends ImageReaderBase {
                 }
                 else {
                     ImageInputStream stream = new MemoryCacheImageInputStream(data);
-                    CompoundDirectory exifMetadata = (CompoundDirectory) new EXIFReader().read(stream);
+                    CompoundDirectory exifMetadata = (CompoundDirectory) new TIFFReader().read(stream);
 
                     if (exifMetadata.directoryCount() == 2) {
                         Directory ifd1 = exifMetadata.getDirectory(1);
 
-                        Entry compression = ifd1.getEntryById(TIFF.TAG_COMPRESSION);
-                        // 1 = no compression, 6 = JPEG compression (default)
-                        if (compression == null || compression.getValue().equals(1) || compression.getValue().equals(6)) {
-                            Entry jpegLength = ifd1.getEntryById(TIFF.TAG_JPEG_INTERCHANGE_FORMAT_LENGTH);
+                        // Compression: 1 = no compression, 6 = JPEG compression (default)
+                        Entry compressionEntry = ifd1.getEntryById(TIFF.TAG_COMPRESSION);
+                        int compression = compressionEntry == null ? 6 : ((Number) compressionEntry.getValue()).intValue();
 
-                            if ((jpegLength == null || ((Number) jpegLength.getValue()).longValue() > 0)) {
+                        if (compression == 6) {
+                            if (ifd1.getEntryById(TIFF.TAG_JPEG_INTERCHANGE_FORMAT) != null) {
+                                Entry jpegLength = ifd1.getEntryById(TIFF.TAG_JPEG_INTERCHANGE_FORMAT_LENGTH);
+
+                                if ((jpegLength == null || ((Number) jpegLength.getValue()).longValue() > 0)) {
+                                    thumbnails.add(new EXIFThumbnailReader(thumbnailProgressDelegator, getThumbnailReader(), 0, thumbnails.size(), ifd1, stream));
+                                }
+                                else {
+                                    processWarningOccurred("EXIF IFD with empty (zero-length) thumbnail");
+                                }
+                            }
+                            else {
+                                processWarningOccurred("EXIF IFD with JPEG thumbnail missing JPEGInterchangeFormat tag");
+                            }
+                        }
+                        else if (compression == 1) {
+                            if (ifd1.getEntryById(TIFF.TAG_STRIP_OFFSETS) != null) {
                                 thumbnails.add(new EXIFThumbnailReader(thumbnailProgressDelegator, getThumbnailReader(), 0, thumbnails.size(), ifd1, stream));
                             }
                             else {
-                                processWarningOccurred("EXIF IFD with empty (zero-length) thumbnail");
+                                processWarningOccurred("EXIF IFD with uncompressed thumbnail missing StripOffsets tag");
                             }
                         }
                         else {
-                            processWarningOccurred("EXIF IFD with unknown compression (expected 1 or 6): " + compression.getValue());
+                            processWarningOccurred("EXIF IFD with unknown compression (expected 1 or 6): " + compression);
                         }
                     }
                 }
@@ -1090,24 +1091,29 @@ public class JPEGImageReader extends ImageReaderBase {
 
         IIOMetadata imageMetadata;
 
-        try {
-            imageMetadata = delegate.getImageMetadata(imageIndex);
+        if (isLossless()) {
+            return new JPEGImage10Metadata(segments);
         }
-        catch (IndexOutOfBoundsException knownIssue) {
-            // TMI-101: com.sun.imageio.plugins.jpeg.JPEGBuffer doesn't do proper sanity check of input data.
-            throw new IIOException("Corrupt JPEG data: Bad segment length", knownIssue);
-        }
-        catch (NegativeArraySizeException knownIssue) {
-            // Most likely from com.sun.imageio.plugins.jpeg.SOSMarkerSegment
-            throw new IIOException("Corrupt JPEG data: Bad component count", knownIssue);
-        }
-
-        if (imageMetadata != null && Arrays.asList(imageMetadata.getMetadataFormatNames()).contains(JPEGImage10MetadataCleaner.JAVAX_IMAGEIO_JPEG_IMAGE_1_0)) {
-            if (metadataCleaner == null) {
-                metadataCleaner = new JPEGImage10MetadataCleaner(this);
+        else {
+            try {
+                imageMetadata = delegate.getImageMetadata(imageIndex);
+            }
+            catch (IndexOutOfBoundsException knownIssue) {
+                // TMI-101: com.sun.imageio.plugins.jpeg.JPEGBuffer doesn't do proper sanity check of input data.
+                throw new IIOException("Corrupt JPEG data: Bad segment length", knownIssue);
+            }
+            catch (NegativeArraySizeException knownIssue) {
+                // Most likely from com.sun.imageio.plugins.jpeg.SOSMarkerSegment
+                throw new IIOException("Corrupt JPEG data: Bad component count", knownIssue);
             }
 
-            return metadataCleaner.cleanMetadata(imageMetadata);
+            if (imageMetadata != null && Arrays.asList(imageMetadata.getMetadataFormatNames()).contains(JPEGImage10MetadataCleaner.JAVAX_IMAGEIO_JPEG_IMAGE_1_0)) {
+                if (metadataCleaner == null) {
+                    metadataCleaner = new JPEGImage10MetadataCleaner(this);
+                }
+
+                return metadataCleaner.cleanMetadata(imageMetadata);
+            }
         }
 
         return imageMetadata;
@@ -1123,7 +1129,7 @@ public class JPEGImageReader extends ImageReaderBase {
         super.processWarningOccurred(warning);
     }
 
-    static void invertCMYK(final Raster raster) {
+    private static void invertCMYK(final Raster raster) {
         byte[] data = ((DataBufferByte) raster.getDataBuffer()).getData();
 
         for (int i = 0, dataLength = data.length; i < dataLength; i++) {
@@ -1131,19 +1137,19 @@ public class JPEGImageReader extends ImageReaderBase {
         }
     }
 
-    public static void convertYCbCr2RGB(final Raster raster) {
+    private static void convertYCbCr2RGB(final Raster raster, final int numComponents) {
         final int height = raster.getHeight();
         final int width = raster.getWidth();
         final byte[] data = ((DataBufferByte) raster.getDataBuffer()).getData();
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                YCbCrConverter.convertYCbCr2RGB(data, data, (x + y * width) * 3);
+                YCbCrConverter.convertYCbCr2RGB(data, data, (x + y * width) * numComponents);
             }
         }
     }
 
-    public static void convertYCCK2CMYK(final Raster raster) {
+    private static void convertYCCK2CMYK(final Raster raster) {
         final int height = raster.getHeight();
         final int width = raster.getWidth();
         final byte[] data = ((DataBufferByte) raster.getDataBuffer()).getData();
@@ -1292,10 +1298,10 @@ public class JPEGImageReader extends ImageReaderBase {
 
                     try {
                         if (region.length >= 4) {
-                            roi = new Rectangle(Integer.parseInt(region[0]), Integer.parseInt(region[2]), Integer.parseInt(region[2]), Integer.parseInt(region[3]));
+                            roi = new Rectangle(Integer.parseInt(region[0]), Integer.parseInt(region[1]), Integer.parseInt(region[2]), Integer.parseInt(region[3]));
                         }
                         else {
-                            roi = new Rectangle(Integer.parseInt(region[0]), Integer.parseInt(region[2]));
+                            roi = new Rectangle(Integer.parseInt(region[0]), Integer.parseInt(region[1]));
                         }
                     }
                     catch (IndexOutOfBoundsException | NumberFormatException e) {
@@ -1388,10 +1394,12 @@ public class JPEGImageReader extends ImageReaderBase {
                     param.setSourceSubsampling(subX, subY, xOff, yOff);
                     param.setSourceRegion(roi);
 
-                    image = reader.getImageTypes(0).next().createBufferedImage((reader.getWidth(0) + subX - 1)/ subX, (reader.getHeight(0) + subY - 1) / subY);
+//                    image = reader.getImageTypes(0).next().createBufferedImage((reader.getWidth(0) + subX - 1)/ subX, (reader.getHeight(0) + subY - 1) / subY);
+                    image = null;
                 }
                 else {
-                    image = reader.getImageTypes(0).next().createBufferedImage(reader.getWidth(0), reader.getHeight(0));
+//                    image = reader.getImageTypes(0).next().createBufferedImage(reader.getWidth(0), reader.getHeight(0));
+                    image = null;
                 }
                 param.setDestination(image);
 

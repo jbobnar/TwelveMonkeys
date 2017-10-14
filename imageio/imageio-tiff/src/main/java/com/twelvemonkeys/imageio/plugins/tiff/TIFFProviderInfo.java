@@ -46,12 +46,12 @@ final class TIFFProviderInfo extends ReaderWriterProviderInfo {
                 new String[] {
                         "image/tiff", "image/x-tiff"
                 },
-                "com.twelvemkonkeys.imageio.plugins.tiff.TIFFImageReader",
+                "com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReader",
                 new String[] {"com.twelvemonkeys.imageio.plugins.tiff.TIFFImageReaderSpi"},
                 "com.twelvemonkeys.imageio.plugins.tiff.TIFFImageWriter",
-                new String[] {"com.twelvemkonkeys.imageio.plugins.tif.TIFFImageWriterSpi"},
-                false, TIFFMedataFormat.SUN_NATIVE_STREAM_METADATA_FORMAT_NAME, "TODO", null, null,
-                true, TIFFMedataFormat.SUN_NATIVE_IMAGE_METADATA_FORMAT_NAME, "com.twelvemonkeys.imageio.plugins.tiff.TIFFImageMetadata", null, null
+                new String[] {"com.twelvemonkeys.imageio.plugins.tiff.TIFFImageWriterSpi"},
+                false, TIFFStreamMetadata.SUN_NATIVE_STREAM_METADATA_FORMAT_NAME, "com.twelvemonkeys.imageio.plugins.tiff.TIFFStreamMetadataFormat", null, null,
+                true, TIFFMedataFormat.SUN_NATIVE_IMAGE_METADATA_FORMAT_NAME, "com.twelvemonkeys.imageio.plugins.tiff.TIFFMedataFormat", null, null
         );
     }
 }

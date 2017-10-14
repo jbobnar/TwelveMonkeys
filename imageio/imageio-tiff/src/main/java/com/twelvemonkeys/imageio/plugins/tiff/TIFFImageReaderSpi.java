@@ -28,17 +28,15 @@
 
 package com.twelvemonkeys.imageio.plugins.tiff;
 
-import java.io.IOException;
-import java.nio.ByteOrder;
-import java.util.Iterator;
-import java.util.Locale;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFF;
+import com.twelvemonkeys.imageio.spi.ImageReaderSpiBase;
 
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.spi.ServiceRegistry;
 import javax.imageio.stream.ImageInputStream;
-
-import com.twelvemonkeys.imageio.metadata.exif.TIFF;
-import com.twelvemonkeys.imageio.spi.ImageReaderSpiBase;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.Locale;
 
 /**
  * TIFFImageReaderSpi
@@ -47,7 +45,7 @@ import com.twelvemonkeys.imageio.spi.ImageReaderSpiBase;
  * @author last modified by $Author: haraldk$
  * @version $Id: TIFFImageReaderSpi.java,v 1.0 08.05.12 15:14 haraldk Exp$
  */
-public class TIFFImageReaderSpi extends ImageReaderSpiBase {
+public final class TIFFImageReaderSpi extends ImageReaderSpiBase {
     /**
      * Creates a {@code TIFFImageReaderSpi}.
      */
@@ -70,35 +68,13 @@ public class TIFFImageReaderSpi extends ImageReaderSpiBase {
         catch (ClassNotFoundException ignore) {
             // This is actually OK, now we don't have to do anything
         }
-
-        moveForward(registry, category, "com.twelvemonkeys.imageio.plugins.cr2.CR2ImageReaderSpi");
-//        moveForward(registry, category, "com.twelvemonkeys.imageio.plugins.dng.DNGImageReaderSpi");
-        moveForward(registry, category, "com.twelvemonkeys.imageio.plugins.nef.NEFImageReaderSpi");
-        Iterator<ImageReaderSpi> spi = registry.getServiceProviders((Class<ImageReaderSpi>)category, true);
-        ImageReaderSpi irs;
-        while(spi.hasNext()) {
-            irs = spi.next();
-            if (irs.getClass().getName().startsWith("it.tidalwave")) {
-                registry.setOrdering((Class<ImageReaderSpi>) category, irs, this);
-            }
-        }
-    }
-
-    private void moveForward(ServiceRegistry registry, Class<?> category, String spiClass) {
-        try {
-            Class<ImageReaderSpi> providerClass = (Class<ImageReaderSpi>) Class.forName(spiClass);
-            ImageReaderSpi spi = registry.getServiceProviderByClass(providerClass);
-
-            if (spi != null) {
-                registry.setOrdering((Class<ImageReaderSpi>) category, spi, this);
-            }
-        }
-        catch (ClassNotFoundException ignore) {
-            // This is actually OK, now we don't have to do anything
-        }
     }
 
     public boolean canDecodeInput(final Object pSource) throws IOException {
+        return canDecodeAs(pSource, TIFF.TIFF_MAGIC);
+    }
+
+    static boolean canDecodeAs(final Object pSource, final int magic) throws IOException {
         if (!(pSource instanceof ImageInputStream)) {
             return false;
         }
@@ -123,11 +99,7 @@ public class TIFFImageReaderSpi extends ImageReaderSpiBase {
                     return false;
                 }
 
-                // TODO: BigTiff uses version 43 instead of TIFF's 42, and header is slightly different, see
-                // http://www.awaresystems.be/imaging/tiff/bigtiff.html
-                int magic = stream.readUnsignedShort();
-
-                return magic == TIFF.TIFF_MAGIC;
+                return stream.readUnsignedShort() == magic;
             }
             finally {
                 stream.setByteOrder(originalOrder);

@@ -29,31 +29,33 @@
 package com.twelvemonkeys.imageio.metadata.exif;
 
 import com.twelvemonkeys.imageio.metadata.*;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFF;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFFEntry;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFFReader;
+import com.twelvemonkeys.imageio.metadata.tiff.TIFFWriter;
 import com.twelvemonkeys.imageio.stream.ByteArrayImageInputStream;
 import com.twelvemonkeys.io.FastByteArrayOutputStream;
 import org.junit.Test;
 
 import javax.imageio.ImageIO;
 import javax.imageio.stream.ImageOutputStream;
-import javax.imageio.stream.ImageOutputStreamImpl;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 /**
- * EXIFWriterTest
+ * TIFFWriterTest
  *
  * @author <a href="mailto:harald.kuhr@gmail.com">Harald Kuhr</a>
  * @author last modified by $Author: haraldk$
- * @version $Id: EXIFWriterTest.java,v 1.0 18.07.13 09:53 haraldk Exp$
+ * @version $Id: TIFFWriterTest.java,v 1.0 18.07.13 09:53 haraldk Exp$
  */
+@SuppressWarnings("deprecation")
 public class EXIFWriterTest extends MetadataWriterAbstractTest {
 
     @Override
@@ -73,16 +75,16 @@ public class EXIFWriterTest extends MetadataWriterAbstractTest {
     @Test
     public void testWriteReadSimple() throws IOException {
         ArrayList<Entry> entries = new ArrayList<>();
-        entries.add(new EXIFEntry(TIFF.TAG_ORIENTATION, 1, TIFF.TYPE_SHORT));
-        entries.add(new EXIFEntry(TIFF.TAG_IMAGE_WIDTH, 1600, TIFF.TYPE_SHORT));
+        entries.add(new TIFFEntry(TIFF.TAG_ORIENTATION, TIFF.TYPE_SHORT, 1));
+        entries.add(new TIFFEntry(TIFF.TAG_IMAGE_WIDTH, TIFF.TYPE_SHORT, 1600));
         entries.add(new AbstractEntry(TIFF.TAG_IMAGE_HEIGHT, 900) {});
-        entries.add(new EXIFEntry(TIFF.TAG_ARTIST, "Harald K.", TIFF.TYPE_ASCII));
+        entries.add(new TIFFEntry(TIFF.TAG_ARTIST, TIFF.TYPE_ASCII, "Harald K."));
         entries.add(new AbstractEntry(TIFF.TAG_SOFTWARE, "TwelveMonkeys ImageIO") {});
         Directory directory = new AbstractDirectory(entries) {};
 
         ByteArrayOutputStream output = new FastByteArrayOutputStream(1024);
         ImageOutputStream imageStream = ImageIO.createImageOutputStream(output);
-        new EXIFWriter().write(directory, imageStream);
+        new TIFFWriter().write(directory, imageStream);
         imageStream.flush();
 
         assertEquals(output.size(), imageStream.getStreamPosition());
@@ -95,12 +97,10 @@ public class EXIFWriterTest extends MetadataWriterAbstractTest {
         assertEquals(0, data[2]);
         assertEquals(42, data[3]);
 
-        Directory read = new EXIFReader().read(new ByteArrayImageInputStream(data));
+        Directory read = new TIFFReader().read(new ByteArrayImageInputStream(data));
 
         assertNotNull(read);
         assertEquals(5, read.size());
-
-        // TODO: Assert that the tags are written in ascending order (don't test the read directory, but the file structure)!
 
         assertNotNull(read.getEntryById(TIFF.TAG_SOFTWARE));
         assertEquals("TwelveMonkeys ImageIO", read.getEntryById(TIFF.TAG_SOFTWARE).getValue());
@@ -122,7 +122,7 @@ public class EXIFWriterTest extends MetadataWriterAbstractTest {
     public void testWriteMotorola() throws IOException {
         ArrayList<Entry> entries = new ArrayList<>();
         entries.add(new AbstractEntry(TIFF.TAG_SOFTWARE, "TwelveMonkeys ImageIO") {});
-        entries.add(new EXIFEntry(TIFF.TAG_IMAGE_WIDTH, Integer.MAX_VALUE, TIFF.TYPE_LONG));
+        entries.add(new TIFFEntry(TIFF.TAG_IMAGE_WIDTH, TIFF.TYPE_LONG, Integer.MAX_VALUE));
         Directory directory = new AbstractDirectory(entries) {};
 
         ByteArrayOutputStream output = new FastByteArrayOutputStream(1024);
@@ -130,7 +130,7 @@ public class EXIFWriterTest extends MetadataWriterAbstractTest {
 
         imageStream.setByteOrder(ByteOrder.BIG_ENDIAN); // BE = Motorola
 
-        new EXIFWriter().write(directory, imageStream);
+        new TIFFWriter().write(directory, imageStream);
         imageStream.flush();
 
         assertEquals(output.size(), imageStream.getStreamPosition());
@@ -143,7 +143,7 @@ public class EXIFWriterTest extends MetadataWriterAbstractTest {
         assertEquals(0, data[2]);
         assertEquals(42, data[3]);
 
-        Directory read = new EXIFReader().read(new ByteArrayImageInputStream(data));
+        Directory read = new TIFFReader().read(new ByteArrayImageInputStream(data));
 
         assertNotNull(read);
         assertEquals(2, read.size());
@@ -157,7 +157,7 @@ public class EXIFWriterTest extends MetadataWriterAbstractTest {
     public void testWriteIntel() throws IOException {
         ArrayList<Entry> entries = new ArrayList<>();
         entries.add(new AbstractEntry(TIFF.TAG_SOFTWARE, "TwelveMonkeys ImageIO") {});
-        entries.add(new EXIFEntry(TIFF.TAG_IMAGE_WIDTH, Integer.MAX_VALUE, TIFF.TYPE_LONG));
+        entries.add(new TIFFEntry(TIFF.TAG_IMAGE_WIDTH, TIFF.TYPE_LONG, Integer.MAX_VALUE));
         Directory directory = new AbstractDirectory(entries) {};
 
         ByteArrayOutputStream output = new FastByteArrayOutputStream(1024);
@@ -165,7 +165,7 @@ public class EXIFWriterTest extends MetadataWriterAbstractTest {
 
         imageStream.setByteOrder(ByteOrder.LITTLE_ENDIAN); // LE = Intel
 
-        new EXIFWriter().write(directory, imageStream);
+        new TIFFWriter().write(directory, imageStream);
         imageStream.flush();
 
         assertEquals(output.size(), imageStream.getStreamPosition());
@@ -178,7 +178,7 @@ public class EXIFWriterTest extends MetadataWriterAbstractTest {
         assertEquals(42, data[2]);
         assertEquals(0, data[3]);
 
-        Directory read = new EXIFReader().read(new ByteArrayImageInputStream(data));
+        Directory read = new TIFFReader().read(new ByteArrayImageInputStream(data));
 
         assertNotNull(read);
         assertEquals(2, read.size());
@@ -189,105 +189,17 @@ public class EXIFWriterTest extends MetadataWriterAbstractTest {
     }
 
     @Test
-    public void testNesting() throws IOException {
-        EXIFEntry artist = new EXIFEntry(TIFF.TAG_SOFTWARE, "TwelveMonkeys ImageIO", TIFF.TYPE_ASCII);
-
-        EXIFEntry subSubSubSubIFD = new EXIFEntry(TIFF.TAG_SUB_IFD, new IFD(Collections.singletonList(artist)), TIFF.TYPE_LONG);
-        EXIFEntry subSubSubIFD = new EXIFEntry(TIFF.TAG_SUB_IFD, new IFD(Collections.singletonList(subSubSubSubIFD)), TIFF.TYPE_LONG);
-        EXIFEntry subSubIFD = new EXIFEntry(TIFF.TAG_SUB_IFD, new IFD(Collections.singletonList(subSubSubIFD)), TIFF.TYPE_LONG);
-        EXIFEntry subIFD = new EXIFEntry(TIFF.TAG_SUB_IFD, new IFD(Collections.singletonList(subSubIFD)), TIFF.TYPE_LONG);
-
-        Directory directory = new IFD(Collections.<Entry>singletonList(subIFD));
-
-        ByteArrayOutputStream output = new FastByteArrayOutputStream(1024);
-        ImageOutputStream imageStream = ImageIO.createImageOutputStream(output);
-
-        new EXIFWriter().write(directory, imageStream);
-        imageStream.flush();
-
-        assertEquals(output.size(), imageStream.getStreamPosition());
-
-        Directory read = new EXIFReader().read(new ByteArrayImageInputStream(output.toByteArray()));
-
-        assertNotNull(read);
-        assertEquals(1, read.size());
-        assertEquals(subIFD, read.getEntryById(TIFF.TAG_SUB_IFD)); // Recursively tests content!
-    }
-
-    @Test
     public void testReadWriteRead() throws IOException {
         Directory original = createReader().read(getDataAsIIS());
 
         ByteArrayOutputStream output = new FastByteArrayOutputStream(256);
-        ImageOutputStream imageOutput = ImageIO.createImageOutputStream(output);
 
-        try {
+        try (ImageOutputStream imageOutput = ImageIO.createImageOutputStream(output)) {
             createWriter().write(original, imageOutput);
-        }
-        finally {
-            imageOutput.close();
         }
 
         Directory read = createReader().read(new ByteArrayImageInputStream(output.toByteArray()));
 
         assertEquals(original, read);
-    }
-
-    @Test
-    public void testComputeIFDSize() throws IOException {
-        ArrayList<Entry> entries = new ArrayList<>();
-        entries.add(new EXIFEntry(TIFF.TAG_ORIENTATION, 1, TIFF.TYPE_SHORT));
-        entries.add(new EXIFEntry(TIFF.TAG_IMAGE_WIDTH, 1600, TIFF.TYPE_SHORT));
-        entries.add(new AbstractEntry(TIFF.TAG_IMAGE_HEIGHT, 900) {});
-        entries.add(new EXIFEntry(TIFF.TAG_ARTIST, "Harald K.", TIFF.TYPE_ASCII));
-        entries.add(new AbstractEntry(TIFF.TAG_SOFTWARE, "TwelveMonkeys ImageIO") {});
-
-        EXIFWriter writer = createWriter();
-
-        ImageOutputStream stream = new NullImageOutputStream();
-        writer.write(new IFD(entries), stream);
-
-        assertEquals(stream.getStreamPosition(), writer.computeIFDSize(entries) + 12);
-    }
-
-    @Test
-    public void testComputeIFDSizeNested() throws IOException {
-        EXIFEntry artist = new EXIFEntry(TIFF.TAG_SOFTWARE, "TwelveMonkeys ImageIO", TIFF.TYPE_ASCII);
-
-        EXIFEntry subSubSubSubIFD = new EXIFEntry(TIFF.TAG_SUB_IFD, new IFD(Collections.singletonList(artist)), TIFF.TYPE_LONG);
-        EXIFEntry subSubSubIFD = new EXIFEntry(TIFF.TAG_SUB_IFD, new IFD(Collections.singletonList(subSubSubSubIFD)), TIFF.TYPE_LONG);
-        EXIFEntry subSubIFD = new EXIFEntry(TIFF.TAG_SUB_IFD, new IFD(Collections.singletonList(subSubSubIFD)), TIFF.TYPE_LONG);
-        EXIFEntry subIFD = new EXIFEntry(TIFF.TAG_SUB_IFD, new IFD(Collections.singletonList(subSubIFD)), TIFF.TYPE_LONG);
-
-        List<Entry> entries = Collections.<Entry>singletonList(subIFD);
-
-        EXIFWriter writer = createWriter();
-
-        ImageOutputStream stream = new NullImageOutputStream();
-        writer.write(new IFD(entries), stream);
-
-        assertEquals(stream.getStreamPosition(), writer.computeIFDSize(entries) + 12);
-    }
-
-    private static class NullImageOutputStream extends ImageOutputStreamImpl {
-        @Override
-        public void write(int b) throws IOException {
-            streamPos++;
-        }
-
-        @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-            streamPos += len;
-        }
-
-        @Override
-        public int read() throws IOException {
-            throw new UnsupportedOperationException("Method read not implemented");
-        }
-
-        @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-            throw new UnsupportedOperationException("Method read not implemented");
-        }
     }
 }

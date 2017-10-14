@@ -171,13 +171,13 @@ public final class PSDImageReader extends ImageReaderBase {
                 }
 
                 if (header.channels == 1 && header.bits == 8) {
-                    return ImageTypeSpecifiers.createFromBufferedImageType(BufferedImage.TYPE_BYTE_GRAY);
+                    return ImageTypeSpecifiers.createBanded(cs, new int[] {0}, new int[] {0}, DataBuffer.TYPE_BYTE, false, false);
                 }
                 else if (header.channels == 2 && header.bits == 8) {
                     return ImageTypeSpecifiers.createBanded(cs, new int[] {0, 1}, new int[] {0, 0}, DataBuffer.TYPE_BYTE, true, false);
                 }
                 else if (header.channels == 1 && header.bits == 16) {
-                    return ImageTypeSpecifiers.createFromBufferedImageType(BufferedImage.TYPE_USHORT_GRAY);
+                    return ImageTypeSpecifiers.createBanded(cs, new int[] {0}, new int[] {0}, DataBuffer.TYPE_USHORT, false, false);
                 }
                 else if (header.channels == 2 && header.bits == 16) {
                     return ImageTypeSpecifiers.createBanded(cs, new int[] {0, 1}, new int[] {0, 0}, DataBuffer.TYPE_USHORT, true, false);
@@ -267,6 +267,20 @@ public final class PSDImageReader extends ImageReaderBase {
         List<ImageTypeSpecifier> types = new ArrayList<>();
 
         switch (header.mode) {
+            case PSD.COLOR_MODE_GRAYSCALE:
+                if (rawType.getNumBands() == 1 && rawType.getBitsPerBand(0) == 8) {
+                    types.add(ImageTypeSpecifiers.createFromBufferedImageType(BufferedImage.TYPE_BYTE_GRAY));
+                }
+                else if (rawType.getNumBands() >= 2 && rawType.getBitsPerBand(0) == 8) {
+                    types.add(ImageTypeSpecifiers.createInterleaved(cs, new int[] {1, 0}, DataBuffer.TYPE_BYTE, true, false));
+                }
+                else if (rawType.getNumBands() == 1 && rawType.getBitsPerBand(0) == 16) {
+                    types.add(ImageTypeSpecifiers.createFromBufferedImageType(BufferedImage.TYPE_USHORT_GRAY));
+                }
+                else if (rawType.getNumBands() >= 2 && rawType.getBitsPerBand(0) == 16) {
+                    types.add(ImageTypeSpecifiers.createInterleaved(cs, new int[] {1, 0}, DataBuffer.TYPE_USHORT, true, false));
+                }
+                break;
             case PSD.COLOR_MODE_RGB:
                 // Prefer interleaved versions as they are much faster to display
                 if (rawType.getNumBands() == 3 && rawType.getBitsPerBand(0) == 8) {
@@ -283,7 +297,7 @@ public final class PSDImageReader extends ImageReaderBase {
                     // TODO: Integer raster
                     // types.add(ImageTypeSpecifier.createFromBufferedImageType(BufferedImage.INT_ARGB));
                     types.add(ImageTypeSpecifiers.createFromBufferedImageType(BufferedImage.TYPE_4BYTE_ABGR));
-//
+
                     if (!cs.isCS_sRGB()) {
                         // Basically BufferedImage.TYPE_4BYTE_ABGR, with corrected ColorSpace. Possibly slow.
                         types.add(ImageTypeSpecifiers.createInterleaved(cs, new int[] {3, 2, 1, 0}, DataBuffer.TYPE_BYTE, true, false));
@@ -1116,7 +1130,7 @@ public final class PSDImageReader extends ImageReaderBase {
             if (newBandNum > compositeType.getNumBands()) {
                 int[] indices = new int[newBandNum];
                 for (int i = 0, indicesLength = indices.length; i < indicesLength; i++) {
-                    indices[i] = indicesLength - i;
+                    indices[i] = i;
                 }
 
                 int[] offs = new int[newBandNum];

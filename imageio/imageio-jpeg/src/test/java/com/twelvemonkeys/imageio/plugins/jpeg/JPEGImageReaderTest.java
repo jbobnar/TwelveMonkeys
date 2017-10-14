@@ -58,6 +58,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.List;
 
+import static com.twelvemonkeys.imageio.util.IIOUtil.lookupProviderByName;
 import static org.junit.Assert.*;
 import static org.junit.Assume.assumeNoException;
 import static org.junit.Assume.assumeNotNull;
@@ -74,10 +75,10 @@ import static org.mockito.Mockito.*;
  */
 public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader> {
 
-    protected static final JPEGImageReaderSpi SPI = new JPEGImageReaderSpi(lookupDelegateProvider());
+    private static final JPEGImageReaderSpi SPI = new JPEGImageReaderSpi(lookupDelegateProvider());
 
-    protected static ImageReaderSpi lookupDelegateProvider() {
-        return JPEGImageReaderSpi.lookupDelegateProvider(IIORegistry.getDefaultInstance());
+    private static ImageReaderSpi lookupDelegateProvider() {
+        return lookupProviderByName(IIORegistry.getDefaultInstance(), "com.sun.imageio.plugins.jpeg.JPEGImageReaderSpi");
     }
 
     @Override
@@ -94,7 +95,15 @@ public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader
                 new TestData(getClassLoaderResource("/jpeg/jfif-padded-segments.jpg"), new Dimension(20, 45)),
                 new TestData(getClassLoaderResource("/jpeg/0x00-to-0xFF-between-segments.jpg"), new Dimension(16, 16)),
                 new TestData(getClassLoaderResource("/jpeg/jfif-bogus-empty-jfif-segment.jpg"), new Dimension(942, 714)),
-                new TestData(getClassLoaderResource("/jpeg/jfif-16bit-dqt.jpg"), new Dimension(204, 131))
+                new TestData(getClassLoaderResource("/jpeg/app-marker-missing-null-term.jpg"), new Dimension(200, 150)),
+                new TestData(getClassLoaderResource("/jpeg/jfif-16bit-dqt.jpg"), new Dimension(204, 131)),
+                new TestData(getClassLoaderResource("/jpeg/jfif-grayscale-thumbnail.jpg"), new Dimension(2547, 1537)), // Non-compliant JFIF with 8 bit grayscale thumbnail
+                new TestData(getClassLoaderResource("/jpeg-lossless/8_ls.jpg"), new Dimension(800, 535)),  // Lossless gray, 8 bit
+                new TestData(getClassLoaderResource("/jpeg-lossless/16_ls.jpg"), new Dimension(800, 535)),  // Lossless gray, 16 bit
+                new TestData(getClassLoaderResource("/jpeg-lossless/24_ls.jpg"), new Dimension(800, 535)), // Lossless RGB, 8 bit per component (24 bit)
+                new TestData(getClassLoaderResource("/jpeg-lossless/f-18.jpg"), new Dimension(320, 240)), // Lossless RGB, 3 DHTs
+                new TestData(getClassLoaderResource("/jpeg-lossless/testimg_rgb.jpg"), new Dimension(227, 149)), // Lossless RGB, 8 bit per component (24 bit)
+                new TestData(getClassLoaderResource("/jpeg-lossless/testimg_gray.jpg"), new Dimension(512, 512)) // Lossless gray, 16 bit
         );
 
         // More test data in specific tests below
@@ -896,6 +905,76 @@ public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader
     }
 
     @Test
+    public void testReadCMYKAsCMYKSameRGBasRGB() throws IOException {
+        // Make sure CMYK images can be read and still contain their original (embedded) color profile
+        JPEGImageReader reader = createReader();
+
+        // NOTE: Data without ICC profile won't work in this test, as we might end up
+        // using the non-ICC color conversion case and fail miserably on the CI server.
+        List<TestData> cmykData = Arrays.asList(
+                new TestData(getClassLoaderResource("/jpeg/cmyk-sample-multiple-chunk-icc.jpg"), new Dimension(100, 100)),
+                new TestData(getClassLoaderResource("/jpeg/cmyk-sample-custom-icc-bright.jpg"), new Dimension(100, 100))
+        );
+
+        for (TestData data : cmykData) {
+            reader.setInput(data.getInputStream());
+            Iterator<ImageTypeSpecifier> types = reader.getImageTypes(0);
+
+            assertTrue(data + " has no image types", types.hasNext());
+
+            ImageTypeSpecifier cmykType = null;
+            ImageTypeSpecifier rgbType = null;
+
+            while (types.hasNext()) {
+                ImageTypeSpecifier type = types.next();
+
+                int csType = type.getColorModel().getColorSpace().getType();
+                if (rgbType == null && csType == ColorSpace.TYPE_RGB) {
+                    rgbType = type;
+                }
+                else if (cmykType == null && csType == ColorSpace.TYPE_CMYK) {
+                    cmykType = type;
+                }
+
+                if (rgbType != null && cmykType != null) {
+                    break;
+                }
+            }
+
+            assertNotNull("No RGB types for " + data, rgbType);
+            assertNotNull("No CMYK types for " + data, cmykType);
+
+            ImageReadParam param = reader.getDefaultReadParam();
+            param.setSourceRegion(new Rectangle(reader.getWidth(0), 8)); // We don't really need to read it all
+
+            param.setDestinationType(cmykType);
+            BufferedImage imageCMYK = reader.read(0, param);
+
+            param.setDestinationType(rgbType);
+            BufferedImage imageRGB = reader.read(0, param);
+
+            assertNotNull(imageCMYK);
+            assertEquals(ColorSpace.TYPE_CMYK, imageCMYK.getColorModel().getColorSpace().getType());
+
+            assertNotNull(imageRGB);
+            assertEquals(ColorSpace.TYPE_RGB, imageRGB.getColorModel().getColorSpace().getType());
+
+            for (int y = 0; y < imageCMYK.getHeight(); y++) {
+                for (int x = 0; x < imageCMYK.getWidth(); x++) {
+                    int cmykAsRGB = imageCMYK.getRGB(x, y);
+                    int rgb = imageRGB.getRGB(x, y);
+
+                    if (rgb != cmykAsRGB) {
+                        assertRGBEquals(String.format("Diff at [%d, %d]", x, y), rgb, cmykAsRGB, 2);
+                    }
+                }
+            }
+        }
+
+        reader.dispose();
+    }
+
+    @Test
     public void testReadNoJFIFYCbCr() throws IOException {
         // Basically the same issue as http://stackoverflow.com/questions/9340569/jpeg-image-with-wrong-colors
         JPEGImageReader reader = createReader();
@@ -929,9 +1008,7 @@ public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader
      * Slightly fuzzy RGB equals method. Tolerance +/-5 steps.
      */
     private void assertRGBEquals(int expectedRGB, int actualRGB) {
-        assertEquals((expectedRGB >> 16) & 0xff, (actualRGB >> 16) & 0xff, 5);
-        assertEquals((expectedRGB >>  8) & 0xff, (actualRGB >>  8) & 0xff, 5);
-        assertEquals((expectedRGB      ) & 0xff, (actualRGB      ) & 0xff, 5);
+        assertRGBEquals("RGB values differ", expectedRGB, actualRGB, 5);
     }
 
     // Regression: Test subsampling offset within  of bounds
@@ -963,8 +1040,8 @@ public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader
         assertNotNull(image);
 
         // Make sure correct color is actually read, not just left empty
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 2));
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 1));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 2));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 1));
     }
 
     @Test
@@ -980,8 +1057,8 @@ public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader
         assertNotNull(image);
 
         // Make sure correct color is actually read, not just left empty
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 2));
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 1));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 2));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 1));
     }
 
     @Test
@@ -997,8 +1074,8 @@ public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader
         assertNotNull(image);
 
         // Make sure correct color is actually read, not just left empty
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 2));
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 1));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 2));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 1));
     }
 
     @Test
@@ -1027,8 +1104,8 @@ public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader
         assertNotNull(image);
 
         // Make sure correct color is actually read, not just left empty
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 2));
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 1));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 2));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 1));
     }
 
     @Test
@@ -1044,8 +1121,8 @@ public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader
         assertNotNull(image);
 
         // Make sure correct color is actually read, not just left empty
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 2));
-        assertRGBEquals(0xfefefd, image.getRGB(0, image.getHeight() - 1));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 2));
+        assertRGBEquals(0xfffefefd, image.getRGB(0, image.getHeight() - 1));
     }
 
     @Test
@@ -1107,6 +1184,7 @@ public class JPEGImageReaderTest extends ImageReaderAbstractTest<JPEGImageReader
                     }
                 }
                 catch (IIOException e) {
+                    e.printStackTrace();
                     fail(String.format("Reading metadata failed for %s image %s: %s", testData, i, e.getMessage()));
                 }
             }
