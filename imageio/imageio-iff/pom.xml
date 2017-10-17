@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.twelvemonkeys.imageio</groupId>
         <artifactId>imageio</artifactId>
-        <version>${project.version}</version>
+        <version>3.4.1</version>
     </parent>
     <artifactId>imageio-iff</artifactId>
     <name>TwelveMonkeys :: ImageIO :: IFF plugin</name>
@@ -24,5 +24,4 @@
             <type>test-jar</type>
         </dependency>
     </dependencies>
-    <version>${project.version}</version>
 </project>

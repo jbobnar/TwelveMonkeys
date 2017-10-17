@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.twelvemonkeys</groupId>
         <artifactId>twelvemonkeys</artifactId>
-        <version>${project.version}</version>
+        <version>3.4.1</version>
     </parent>
     <groupId>com.twelvemonkeys.common</groupId>
     <artifactId>common</artifactId>
@@ -20,29 +20,6 @@
         <module>common-image</module>
     </modules>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>${project.groupId}</groupId>
-                <artifactId>common-lang</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>${project.groupId}</groupId>
-                <artifactId>common-lang</artifactId>
-                <version>${project.version}</version>
-                <type>test-jar</type>
-                <scope>test</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>${project.groupId}</groupId>
-                <artifactId>common-io</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>junit</groupId>
