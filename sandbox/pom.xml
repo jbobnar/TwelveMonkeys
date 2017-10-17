@@ -5,7 +5,6 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.twelvemonkeys.sandbox</groupId>
     <artifactId>sandbox</artifactId>
-    <version>3.1-SNAPSHOT</version>
     <name>TwelveMonkeys :: Sandbox</name>
     <packaging>pom</packaging>
 
@@ -16,7 +15,7 @@
     <parent>
         <groupId>com.twelvemonkeys</groupId>
         <artifactId>twelvemonkeys</artifactId>
-        <version>3.1-SNAPSHOT</version>
+        <version>3.4.1</version>
     </parent>
 
     <modules>
@@ -40,63 +39,63 @@
             <dependency>
                 <groupId>com.twelvemonkeys.common</groupId>
                 <artifactId>common-lang</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>compile</scope>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.common</groupId>
                 <artifactId>common-io</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>compile</scope>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.common</groupId>
                 <artifactId>common-image</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>compile</scope>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.servlet</groupId>
                 <artifactId>servlet</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>compile</scope>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.swing</groupId>
                 <artifactId>swing-core</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>compile</scope>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.swing</groupId>
                 <artifactId>swing-application</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>compile</scope>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-core</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.sandbox</groupId>
                 <artifactId>sandbox-common</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>compile</scope>
             </dependency>
 
             <dependency>
                 <groupId>com.twelvemonkeys.common</groupId>
                 <artifactId>common-io</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>test</scope>
                 <type>test-jar</type>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.common</groupId>
                 <artifactId>common-lang</artifactId>
-                <version>${project.version}</version>
+                <version>3.4.1</version>
                 <scope>test</scope>
                 <type>test-jar</type>
             </dependency>
@@ -132,7 +131,7 @@
                         <manifestEntries>
                             <Implementation-Title>${project.name}</Implementation-Title>
                             <Implementation-Vendor>TwelveMonkeys</Implementation-Vendor>
-                            <Implementation-Version>${project.version}</Implementation-Version>
+                            <Implementation-Version>3.4.1</Implementation-Version>
                             <Implementation-URL>http://github.com/haraldk/TwelveMonkeys</Implementation-URL>
                         </manifestEntries>
                     </archive>

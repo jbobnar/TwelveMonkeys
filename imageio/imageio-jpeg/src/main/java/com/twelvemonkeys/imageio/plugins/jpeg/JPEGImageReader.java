@@ -371,7 +371,7 @@ public final class JPEGImageReader extends ImageReaderBase {
 
             return bufferedImage;
         }
-        
+
         // We need to apply ICC profile unless the profile is sRGB/default gray (whatever that is)
         // - or only filter out the bad ICC profiles in the JPEGSegmentImageInputStream.
         else if (delegate.canReadRaster() && (
@@ -840,7 +840,7 @@ public final class JPEGImageReader extends ImageReaderBase {
         if (!Boolean.parseBoolean(System.getProperty("doColorManagement", "true"))) {
             return null;
         }
-        
+
         List<Application> segments = getAppSegments(JPEG.APP2, "ICC_PROFILE");
 
         // TODO: Possibly move this logic to the ICCProfile class...

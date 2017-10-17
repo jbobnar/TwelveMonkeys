@@ -33,7 +33,7 @@
     <parent>
         <artifactId>imageio</artifactId>
         <groupId>com.twelvemonkeys.imageio</groupId>
-        <version>3.3-SNAPSHOT</version>
+        <version>3.4.1</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -47,7 +47,7 @@
             <artifactId>imageio-core</artifactId>
         </dependency>
         <dependency>
-            <version>${project.version}</version>
+            <version>3.4.1</version>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-core</artifactId>
             <classifier>tests</classifier>
@@ -57,11 +57,10 @@
             <artifactId>imageio-metadata</artifactId>
         </dependency>
         <dependency>
-            <version>${project.version}</version>
+            <version>3.4.1</version>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-jpeg</artifactId>
         </dependency>
     </dependencies>
 
-    <version>${project.version}</version>
 </project>
