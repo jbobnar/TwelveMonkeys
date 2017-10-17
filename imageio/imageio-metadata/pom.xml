@@ -3,7 +3,7 @@
     <parent>
         <groupId>com.twelvemonkeys.imageio</groupId>
         <artifactId>imageio</artifactId>
-        <version>${project.version}</version>
+        <version>3.4.1</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>imageio-metadata</artifactId>
@@ -24,5 +24,4 @@
             <type>test-jar</type>
         </dependency>
     </dependencies>
-    <version>${project.version}</version>
 </project>

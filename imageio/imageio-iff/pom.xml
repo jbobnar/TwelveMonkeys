@@ -25,5 +25,4 @@
             <type>test-jar</type>
         </dependency>
     </dependencies>
-    <version>${project.version}</version>
 </project>

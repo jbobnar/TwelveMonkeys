@@ -975,6 +975,7 @@ public final class JPEGImageReader extends ImageReaderBase {
         if (!Boolean.parseBoolean(System.getProperty(Constants.READ_EMBEDDED_PROFILE, "true"))) {
             return null;
         }
+
         List<JPEGSegment> segments = getAppSegments(JPEG.APP2, "ICC_PROFILE");
 
         if (segments.size() == 1) {

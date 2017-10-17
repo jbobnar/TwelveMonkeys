@@ -25,5 +25,4 @@
         </dependency>
     </dependencies>
 
-    <version>${project.version}</version>
 </project>

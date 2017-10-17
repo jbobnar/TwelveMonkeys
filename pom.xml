@@ -105,8 +105,8 @@
                         <manifestEntries>
                             <Implementation-Title>twelvemonkeys-${project.artifactId}</Implementation-Title>
                             <Implementation-Vendor>TwelveMonkeys</Implementation-Vendor>
-                            <Implementation-Version>${project.version}</Implementation-Version>
-                            <Implementation-URL>${project.url}</Implementation-URL>
+                            <Implementation-Version>3.4.1</Implementation-Version>
+                            <Implementation-URL>${project.scm.url}</Implementation-URL>
                         </manifestEntries>
                     </archive>
                 </configuration>
