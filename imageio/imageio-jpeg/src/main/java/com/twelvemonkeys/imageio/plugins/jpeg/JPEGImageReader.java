@@ -28,6 +28,46 @@
 
 package com.twelvemonkeys.imageio.plugins.jpeg;
 
+import java.awt.Rectangle;
+import java.awt.color.ColorSpace;
+import java.awt.color.ICC_ColorSpace;
+import java.awt.color.ICC_Profile;
+import java.awt.image.BufferedImage;
+import java.awt.image.ColorConvertOp;
+import java.awt.image.DataBuffer;
+import java.awt.image.DataBufferByte;
+import java.awt.image.Raster;
+import java.awt.image.RasterOp;
+import java.awt.image.RenderedImage;
+import java.awt.image.WritableRaster;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.SequenceInputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import javax.imageio.IIOException;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
+import javax.imageio.ImageReader;
+import javax.imageio.ImageTypeSpecifier;
+import javax.imageio.event.IIOReadUpdateListener;
+import javax.imageio.event.IIOReadWarningListener;
+import javax.imageio.metadata.IIOMetadata;
+import javax.imageio.metadata.IIOMetadataFormatImpl;
+import javax.imageio.metadata.IIOMetadataNode;
+import javax.imageio.spi.ImageReaderSpi;
+import javax.imageio.stream.ImageInputStream;
+import javax.imageio.stream.MemoryCacheImageInputStream;
+
 import com.twelvemonkeys.imageio.ImageReaderBase;
 import com.twelvemonkeys.imageio.color.ColorSpaces;
 import com.twelvemonkeys.imageio.color.YCbCrConverter;
@@ -39,28 +79,11 @@ import com.twelvemonkeys.imageio.metadata.jpeg.JPEGSegment;
 import com.twelvemonkeys.imageio.metadata.jpeg.JPEGSegmentUtil;
 import com.twelvemonkeys.imageio.metadata.tiff.TIFF;
 import com.twelvemonkeys.imageio.metadata.tiff.TIFFReader;
+import com.twelvemonkeys.imageio.util.Constants;
 import com.twelvemonkeys.imageio.util.ImageTypeSpecifiers;
 import com.twelvemonkeys.imageio.util.ProgressListenerBase;
 import com.twelvemonkeys.lang.Validate;
 import com.twelvemonkeys.xml.XMLSerializer;
-
-import javax.imageio.*;
-import javax.imageio.event.IIOReadUpdateListener;
-import javax.imageio.event.IIOReadWarningListener;
-import javax.imageio.metadata.IIOMetadata;
-import javax.imageio.metadata.IIOMetadataFormatImpl;
-import javax.imageio.metadata.IIOMetadataNode;
-import javax.imageio.spi.ImageReaderSpi;
-import javax.imageio.stream.ImageInputStream;
-import javax.imageio.stream.MemoryCacheImageInputStream;
-import java.awt.*;
-import java.awt.color.ColorSpace;
-import java.awt.color.ICC_ColorSpace;
-import java.awt.color.ICC_Profile;
-import java.awt.image.*;
-import java.io.*;
-import java.util.*;
-import java.util.List;
 
 /**
  * A JPEG {@code ImageReader} implementation based on the JRE {@code JPEGImageReader},
@@ -409,8 +432,20 @@ public final class JPEGImageReader extends ImageReaderBase {
         // leaving the fourth band as alpha (or pretend it's not there, by creating a child raster).
         BufferedImage image = getDestination(param, imageTypes, origWidth, origHeight);
         WritableRaster destination = image.getRaster();
+        Hashtable<String, Object> properties = new Hashtable<>();
+        if (profile != null) {
+            properties.put(Constants.ICC_PROFILE,profile);
+        }
+        image = new BufferedImage(image.getColorModel(),destination,image.isAlphaPremultiplied(),properties);
+        if (!Boolean.parseBoolean(System.getProperty(Constants.DO_COLOR_MANAGEMENT, "true"))) {
+            // If color management should not be done (taken care of externally), do not do anything with the profile
+            profile = null;
+        }
+
 
         // TODO: checkReadParamBandSettings(param, );
+
+        ColorSpace destinationSpace = image.getColorModel().getColorSpace();
 
         RasterOp convert = null;
         ICC_ColorSpace intendedCS = profile != null ? ColorSpaces.createColorSpace(profile) : null;
@@ -431,17 +466,17 @@ public final class JPEGImageReader extends ImageReaderBase {
                         intendedCS.getNumComponents(), startOfFrame.marker & 0xf, startOfFrame.componentsInFrame(), csType
                 ));
 
-                if (csType == JPEGColorSpace.CMYK && image.getColorModel().getColorSpace().getType() != ColorSpace.TYPE_CMYK) {
-                    convert = new ColorConvertOp(ColorSpaces.getColorSpace(ColorSpaces.CS_GENERIC_CMYK), image.getColorModel().getColorSpace(), null);
+                if (csType == JPEGColorSpace.CMYK && destinationSpace.getType() != ColorSpace.TYPE_CMYK) {
+                    convert = new ColorConvertOp(ColorSpaces.getColorSpace(ColorSpaces.CS_GENERIC_CMYK), destinationSpace, null);
                 }
             }
             // NOTE: Avoid using CCOp if same color space, as it's more compatible that way
-            else if (intendedCS != image.getColorModel().getColorSpace()) {
+            else if (intendedCS != destinationSpace) {
                 if (DEBUG) {
-                    System.err.println("Converting from " + intendedCS + " to " + (image.getColorModel().getColorSpace().isCS_sRGB() ? "sRGB" : image.getColorModel().getColorSpace()));
+                    System.err.println("Converting from " + intendedCS + " to " + (destinationSpace.isCS_sRGB() ? "sRGB" : destinationSpace));
                 }
 
-                convert = new ColorConvertOp(intendedCS, image.getColorModel().getColorSpace(), null);
+                convert = new ColorConvertOp(intendedCS, destinationSpace, null);
             }
             // Else, pass through with no conversion
         }
@@ -455,8 +490,8 @@ public final class JPEGImageReader extends ImageReaderBase {
                 );
 
                 // NOTE: Avoid using CCOp if same color space, as it's more compatible that way
-                if (cmykCS != image.getColorModel().getColorSpace()) {
-                    convert = new ColorConvertOp(cmykCS, image.getColorModel().getColorSpace(), null);
+                if (cmykCS != destinationSpace) {
+                    convert = new ColorConvertOp(cmykCS, destinationSpace, null);
                 }
             }
             else {
@@ -837,7 +872,7 @@ public final class JPEGImageReader extends ImageReaderBase {
         // TODO: Allow metadata to contain the wrongly indexed profiles, if readable
         // NOTE: We ignore any profile with wrong index for reading and image types, just to be on the safe side
 
-        if (!Boolean.parseBoolean(System.getProperty("doColorManagement", "true"))) {
+        if (!Boolean.parseBoolean(System.getProperty(Constants.READ_EMBEDDED_PROFILE, "true"))) {
             return null;
         }
 

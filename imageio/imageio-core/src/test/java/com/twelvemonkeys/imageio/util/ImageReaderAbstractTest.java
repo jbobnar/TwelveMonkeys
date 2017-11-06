@@ -96,7 +96,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
 
     protected boolean allowsNullRawImageType() {
         return false;
-    }    
+    }
 
     protected static void failBecause(String message, Throwable exception) {
         AssertionError error = new AssertionError(message);
@@ -1146,7 +1146,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         ImageReader reader = createReader();
         TestData data = getTestData().get(0);
         reader.setInput(data.getInputStream());
-        
+
         IIOReadProgressListener listener = mock(IIOReadProgressListener.class);
         reader.addIIOReadProgressListener(listener);
         reader.removeIIOReadProgressListener(listener);
@@ -1332,7 +1332,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 failBecause("Could not read " + data.getInput() + " with explicit destination " + destination, e);
             }
 
-            assertSame(destination, result);
+            assertSame(destination.getRaster(), result.getRaster());
+            assertSame(destination.getColorModel(), result.getColorModel());
         }
     }
 
@@ -1358,7 +1359,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 failBecause("Image could not be read", e);
             }
 
-            assertSame(destination, result);
+            assertSame(destination.getRaster(), result.getRaster());
+            assertSame(destination.getColorModel(), result.getColorModel());
         }
         else {
             System.err.println("WARNING: Test skipped due to reader.getRawImageType(0) returning null");
@@ -1387,7 +1389,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 System.err.println("WARNING: Reader does not throw exception with non-declared destination: " + destination);
 
                 // Test that the destination is really taken into account
-                assertSame(destination, result);
+                assertSame(destination.getRaster(), result.getRaster());
+                assertSame(destination.getColorModel(), result.getColorModel());
             }
             catch (IIOException expected) {
                 // TODO: This is thrown by ImageReader.getDestination. But are we happy with that?
@@ -1447,7 +1450,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             ImageTypeSpecifier valid = pValidTypes.next();
             boolean removed = illegalTypes.remove(valid);
 
-            // TODO: 4BYTE_ABGR (6) and 4BYTE_ABGR_PRE (7) is essentially the same type... 
+            // TODO: 4BYTE_ABGR (6) and 4BYTE_ABGR_PRE (7) is essentially the same type...
             // #$@*%$! ImageTypeSpecifier.equals is not well-defined
             if (!removed) {
                 for (Iterator<ImageTypeSpecifier> iterator = illegalTypes.iterator(); iterator.hasNext();) {
@@ -1544,10 +1547,10 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         T reader = createReader();
         TestData data = getTestData().get(0);
         reader.setInput(data.getInputStream());
-        
+
         BufferedImage one = reader.read(0);
         BufferedImage two = reader.read(0);
-       
+
         assertNotSame("Multiple reads return same (mutable) image", one, two);
 
         Graphics2D g = one.createGraphics();
@@ -1566,7 +1569,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
     @Test
     public void testNotBadCachingThumbnails() throws IOException {
         T reader = createReader();
-        
+
         if (reader.readerSupportsThumbnails()) {
             for (TestData data : getTestData()) {
                 reader.setInput(data.getInputStream());
@@ -1574,7 +1577,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 int images = reader.getNumImages(true);
                 for (int i = 0; i < images; i++) {
                     int thumbnails = reader.getNumThumbnails(0);
-                    
+
                     for (int j = 0; j < thumbnails; j++) {
                         BufferedImage one = reader.readThumbnail(i, j);
                         BufferedImage two = reader.readThumbnail(i, j);
@@ -1593,7 +1596,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
 
                         assertTrue(one.getRGB(0, 0) != two.getRGB(0, 0));
                     }
-                    
+
                     if (thumbnails > 0) {
                         // We've tested thumbnails, let's get out of here
                         return;
@@ -1604,7 +1607,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             fail("No thumbnails tested for reader that supports thumbnails.");
         }
     }
-    
+
     @Ignore("TODO: Implement")
     @Test
     public void testSetDestinationBands() throws IOException {

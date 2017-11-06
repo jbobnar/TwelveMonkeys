@@ -31,6 +31,7 @@ package com.twelvemonkeys.imageio.plugins.psd;
 import com.twelvemonkeys.image.ImageUtil;
 import com.twelvemonkeys.imageio.ImageReaderBase;
 import com.twelvemonkeys.imageio.color.ColorSpaces;
+import com.twelvemonkeys.imageio.util.Constants;
 import com.twelvemonkeys.imageio.util.ImageTypeSpecifiers;
 
 import javax.imageio.IIOException;
@@ -66,7 +67,7 @@ import java.util.List;
 // TODO: Consider Romain Guy's Java 2D implementation of PS filters for the blending modes in layers
 // http://www.curious-creature.org/2006/09/20/new-blendings-modes-for-java2d/
 // See http://www.codeproject.com/KB/graphics/PSDParser.aspx
-// See http://www.adobeforums.com/webx?14@@.3bc381dc/0  
+// See http://www.adobeforums.com/webx?14@@.3bc381dc/0
 // Done: Allow reading the extra alpha channels (index after composite data)
 public final class PSDImageReader extends ImageReaderBase {
 
@@ -165,7 +166,7 @@ public final class PSDImageReader extends ImageReaderBase {
                 // NOTE: Duotone (whatever that is) should be treated as gray scale
                 // Fall-through
             case PSD.COLOR_MODE_GRAYSCALE:
-                cs = getEmbeddedColorSpace();
+                cs = getEmbeddedColorSpace(true);
                 if (cs == null) {
                     cs = ColorSpace.getInstance(ColorSpace.CS_GRAY);
                 }
@@ -192,7 +193,7 @@ public final class PSDImageReader extends ImageReaderBase {
                 throw new IIOException(String.format("Unsupported channel count/bit depth for Gray Scale PSD: %d channels/%d bits", header.channels, header.bits));
 
             case PSD.COLOR_MODE_RGB:
-                cs = getEmbeddedColorSpace();
+                cs = getEmbeddedColorSpace(true);
                 if (cs == null) {
                     cs = ColorSpace.getInstance(ColorSpace.CS_sRGB);
                 }
@@ -219,7 +220,7 @@ public final class PSDImageReader extends ImageReaderBase {
                 throw new IIOException(String.format("Unsupported channel count/bit depth for RGB PSD: %d channels/%d bits", header.channels, header.bits));
 
             case PSD.COLOR_MODE_CMYK:
-                cs = getEmbeddedColorSpace();
+                cs = getEmbeddedColorSpace(true);
                 if (cs == null) {
                     cs = ColorSpaces.getColorSpace(ColorSpaces.CS_GENERIC_CMYK);
                 }
@@ -339,7 +340,17 @@ public final class PSDImageReader extends ImageReaderBase {
         return types.iterator();
     }
 
-    private ColorSpace getEmbeddedColorSpace() throws IOException {
+    private ColorSpace getEmbeddedColorSpace(boolean doingManagement) throws IOException {
+        if (!Boolean.parseBoolean(System.getProperty(Constants.READ_EMBEDDED_PROFILE, "true"))) {
+            return null;
+        }
+        if (doingManagement) {
+            if (!Boolean.parseBoolean(System.getProperty(Constants.DO_COLOR_MANAGEMENT, "true"))) {
+                // If color management should not be done (taken care of externally), do not do anything with the profile
+                return null;
+            }
+        }
+
         readImageResources(true);
 
         if (colorSpace == null) {
@@ -370,6 +381,19 @@ public final class PSDImageReader extends ImageReaderBase {
         }
 
         BufferedImage image = getDestination(param, getImageTypes(imageIndex), header.width, header.height);
+        Hashtable<String, Object> properties = new Hashtable<>();
+        ColorSpace space = getEmbeddedColorSpace(false);
+        if (space instanceof ICC_ColorSpace) {
+            ICC_Profile profile = ((ICC_ColorSpace)space).getProfile();
+            properties.put(Constants.ICC_PROFILE,profile);
+        }
+        image = new BufferedImage(image.getColorModel(),image.getRaster(),image.isAlphaPremultiplied(),properties);
+
+        if (!Boolean.parseBoolean(System.getProperty(Constants.DO_COLOR_MANAGEMENT, "true"))) {
+            // If color management should not be done (taken care of externally), do not do anything with the profile
+//            profile = null;
+        }
+
         ImageTypeSpecifier rawType = getRawImageType(imageIndex);
         checkReadParamBandSettings(param, rawType.getNumBands(), image.getSampleModel().getNumBands());
 
