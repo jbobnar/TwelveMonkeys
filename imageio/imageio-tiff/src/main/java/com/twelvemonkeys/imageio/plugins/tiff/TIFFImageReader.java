@@ -99,7 +99,7 @@ import com.twelvemonkeys.imageio.metadata.tiff.TIFFReader;
 import com.twelvemonkeys.imageio.metadata.xmp.XMPReader;
 import com.twelvemonkeys.imageio.stream.ByteArrayImageInputStream;
 import com.twelvemonkeys.imageio.stream.SubImageInputStream;
-import com.twelvemonkeys.imageio.util.IIOUtil;
+import com.twelvemonkeys.imageio.util.Constants;
 import com.twelvemonkeys.imageio.util.ImageTypeSpecifiers;
 import com.twelvemonkeys.imageio.util.ProgressListenerBase;
 import com.twelvemonkeys.io.FastByteArrayOutputStream;
@@ -488,7 +488,9 @@ public final class TIFFImageReader extends ImageReaderBase {
         int significantSamples = opaqueSamplesPerPixel + (hasAlpha ? 1 : 0);
 
         // Read embedded cs
-        ICC_Profile profile = getICCProfile();
+        ICC_Profile profile = Boolean.parseBoolean(System.getProperty(Constants.DO_COLOR_MANAGEMENT, "true")) ?
+                getICCProfile() : null;
+
         ColorSpace cs;
 
         switch (interpretation) {
@@ -923,6 +925,12 @@ public final class TIFFImageReader extends ImageReaderBase {
         int height = getHeight(imageIndex);
 
         BufferedImage destination = getDestination(param, getImageTypes(imageIndex), width, height);
+        Hashtable<String,Object> properties = new Hashtable<>();
+        ICC_Profile profile = getICCProfile();
+        if (profile != null) {
+            properties.put(Constants.ICC_PROFILE,profile);
+        }
+        destination = new BufferedImage(destination.getColorModel(),destination.getRaster(),destination.isAlphaPremultiplied(),properties);
         ImageTypeSpecifier rawType = getRawImageType(imageIndex);
         checkReadParamBandSettings(param, rawType.getNumBands(), destination.getSampleModel().getNumBands());
 
@@ -2470,7 +2478,7 @@ public final class TIFFImageReader extends ImageReaderBase {
     }
 
     private ICC_Profile getICCProfile() throws IOException {
-        if (!Boolean.parseBoolean(System.getProperty("doColorManagement", "true"))) {
+        if (!Boolean.parseBoolean(System.getProperty(Constants.READ_EMBEDDED_PROFILE, "true"))) {
             return null;
         }
         Entry entry = currentIFD.getEntryById(TIFF.TAG_ICC_PROFILE);
