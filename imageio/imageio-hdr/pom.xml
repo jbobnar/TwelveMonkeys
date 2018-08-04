@@ -8,6 +8,7 @@
     </parent>
     <artifactId>imageio-hdr</artifactId>
     <name>TwelveMonkeys :: ImageIO :: HDR plugin</name>
+    <version>${project.version}</version>
     <description>
         ImageIO plugin for Radiance RGBE High Dynaimc Range format (HDR).
     </description>

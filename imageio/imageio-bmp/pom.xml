@@ -7,6 +7,7 @@
         <version>3.4.1</version>
     </parent>
     <artifactId>imageio-bmp</artifactId>
+    <version>${project.version}</version>
     <name>TwelveMonkeys :: ImageIO :: BMP plugin</name>
     <description>ImageIO plugin for Microsoft Device Independent Bitmap (BMP/DIB) format.</description>
 

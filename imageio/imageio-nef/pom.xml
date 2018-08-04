@@ -40,7 +40,7 @@
     <artifactId>imageio-nef</artifactId>
     <name>TwelveMonkeys :: ImageIO :: NEF plugin</name>
     <description>ImageIO plugin for Nikon Electronic File (NEF).</description>
-
+    <version>${project.version}</version>
     <dependencies>
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
