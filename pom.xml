@@ -8,7 +8,7 @@
     </parent>
     <groupId>com.twelvemonkeys</groupId>
     <artifactId>twelvemonkeys</artifactId>
-    <version>3.4.1</version>
+    <version>3.5.1</version>
     <packaging>pom</packaging>
     <name>Twelvemonkeys</name>
 
@@ -88,11 +88,11 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.version>3.4.1</project.version>
+        <project.version>3.5.1</project.version>
     </properties>
 
     <build>
-        <finalName>twelvemonkeys-${project.artifactId}-3.4.1</finalName>
+        <finalName>twelvemonkeys-${project.artifactId}-3.5.1</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -102,7 +102,7 @@
                         <manifestEntries>
                             <Implementation-Title>twelvemonkeys-${project.artifactId}</Implementation-Title>
                             <Implementation-Vendor>TwelveMonkeys</Implementation-Vendor>
-                            <Implementation-Version>3.4.1</Implementation-Version>
+                            <Implementation-Version>3.5.1</Implementation-Version>
                             <Implementation-URL>${project.scm.url}</Implementation-URL>
                         </manifestEntries>
                     </archive>

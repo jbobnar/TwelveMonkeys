@@ -4,26 +4,28 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.imageio.plugins.jpeg;
@@ -59,7 +61,7 @@ public class JPEGSegmentImageInputStreamTest {
         ImageIO.setUseCache(false);
     }
 
-    protected URL getClassLoaderResource(final String pName) {
+    private URL getClassLoaderResource(final String pName) {
         return getClass().getResource(pName);
     }
 
@@ -119,7 +121,7 @@ public class JPEGSegmentImageInputStreamTest {
             length++;
         }
 
-        assertThat(length, new LessOrEqual<Long>(10203l)); // In no case should length increase
+        assertThat(length, new LessOrEqual<>(10203L)); // In no case should length increase
 
         assertEquals(9607L, length); // May change, if more chunks are passed to reader...
     }
@@ -149,7 +151,7 @@ public class JPEGSegmentImageInputStreamTest {
             length++;
         }
 
-        assertEquals(9281L, length); // Sanity check: same as file size
+        assertEquals(9281L, length); // Sanity check: same as file size, except..?
     }
 
     @Test
@@ -162,7 +164,7 @@ public class JPEGSegmentImageInputStreamTest {
         assertEquals(JPEG.APP1, appSegments.get(0).marker());
         assertEquals("Exif", appSegments.get(0).identifier());
 
-        stream.seek(0l);
+        stream.seek(0L);
 
         long length = 0;
         while (stream.read() != -1) {
@@ -170,6 +172,32 @@ public class JPEGSegmentImageInputStreamTest {
         }
 
         assertEquals(1061L, length); // Sanity check: same as file size, except padding and the filtered ICC_PROFILE segment
+    }
+
+    @Test
+    public void testEOFExceptionInSegmentParsingShouldNotCreateBadState2() throws IOException {
+        ImageInputStream iis = new JPEGSegmentImageInputStream(ImageIO.createImageInputStream(getClassLoaderResource("/broken-jpeg/51432b02-02a8-11e7-9203-b42b1c43c0c3.jpg")));
+
+        byte[] buffer = new byte[4096];
+
+        // NOTE: This is a simulation of how the native parts of com.sun...JPEGImageReader would read the image...
+        assertEquals(2, iis.read(buffer, 0, buffer.length));
+        assertEquals(2, iis.getStreamPosition());
+
+        iis.seek(2000); // Just a random postion beyond EOF
+        assertEquals(2000, iis.getStreamPosition());
+
+        // So far, so good (but stream position is now really beyond EOF)...
+
+        // This however, will blow up with an EOFException internally (but we'll return -1 to be good)
+        assertEquals(-1, iis.read(buffer, 0, buffer.length));
+        assertEquals(-1, iis.read());
+        assertEquals(2000, iis.getStreamPosition());
+
+        // Again, should just continue returning -1 for ever
+        assertEquals(-1, iis.read());
+        assertEquals(-1, iis.read(buffer, 0, buffer.length));
+        assertEquals(2000, iis.getStreamPosition());
     }
 
     @Test
@@ -189,10 +217,12 @@ public class JPEGSegmentImageInputStreamTest {
 
         // This however, will blow up with an EOFException internally (but we'll return -1 to be good)
         assertEquals(-1, iis.read(buffer, 0, buffer.length));
+        assertEquals(-1, iis.read());
         assertEquals(0x2012, iis.getStreamPosition());
 
         // Again, should just continue returning -1 for ever
         assertEquals(-1, iis.read(buffer, 0, buffer.length));
+        assertEquals(-1, iis.read());
         assertEquals(0x2012, iis.getStreamPosition());
     }
 }

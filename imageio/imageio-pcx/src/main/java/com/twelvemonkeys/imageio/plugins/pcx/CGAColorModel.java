@@ -4,26 +4,28 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.imageio.plugins.pcx;
@@ -56,52 +58,36 @@ final class CGAColorModel {
             // Configured palette
             byte byte3 = cgaMode[3];
 
-            System.err.printf("background: %d\n", background);
-            System.err.printf("cgaMode: %02x\n", (byte3 & 0xff));
-            System.err.printf("cgaMode: %d\n", (byte3 & 0x80) >> 7);
-            System.err.printf("cgaMode: %d\n", (byte3 & 0x40) >> 6);
-            System.err.printf("cgaMode: %d\n", (byte3 & 0x20) >> 5);
-
-            boolean colorBurstEnable = (byte3 & 0x80) == 0;
+            boolean colorBurstEnable = (byte3 & 0x80) != 0;
             boolean paletteValue = (byte3 & 0x40) != 0;
             boolean intensityValue = (byte3 & 0x20) != 0;
 
-            System.err.println("colorBurstEnable: " + colorBurstEnable);
-            System.err.println("paletteValue: " + paletteValue);
-            System.err.println("intensityValue: " + intensityValue);
+            if (PCXImageReader.DEBUG) {
+                System.err.println("colorBurstEnable: " + colorBurstEnable);
+                System.err.println("paletteValue: " + paletteValue);
+                System.err.println("intensityValue: " + intensityValue);
+            }
 
             // Set up the fixed part of the palette
-            if (colorBurstEnable) {
-                if (paletteValue) {
-                    if (intensityValue) {
-                        cmap[1] = CGA_PALETTE[11];
-                        cmap[2] = CGA_PALETTE[13];
-                        cmap[3] = CGA_PALETTE[15];
-                    } else {
-                        cmap[1] = CGA_PALETTE[3];
-                        cmap[2] = CGA_PALETTE[5];
-                        cmap[3] = CGA_PALETTE[7];
-                    }
+            if (paletteValue) {
+                if (intensityValue) {
+                    cmap[1] = CGA_PALETTE[11];
+                    cmap[2] = colorBurstEnable ? CGA_PALETTE[13] : CGA_PALETTE[12];
+                    cmap[3] = CGA_PALETTE[15];
                 } else {
-                    if (intensityValue) {
-                        cmap[1] = CGA_PALETTE[10];
-                        cmap[2] = CGA_PALETTE[12];
-                        cmap[3] = CGA_PALETTE[14];
-                    } else {
-                        cmap[1] = CGA_PALETTE[2];
-                        cmap[2] = CGA_PALETTE[4];
-                        cmap[3] = CGA_PALETTE[6];
-                    }
+                    cmap[1] = CGA_PALETTE[3];
+                    cmap[2] = colorBurstEnable ? CGA_PALETTE[5] : CGA_PALETTE[4];
+                    cmap[3] = CGA_PALETTE[7];
                 }
             } else {
                 if (intensityValue) {
-                    cmap[1] = CGA_PALETTE[11];
+                    cmap[1] = CGA_PALETTE[10];
                     cmap[2] = CGA_PALETTE[12];
-                    cmap[3] = CGA_PALETTE[15];
+                    cmap[3] = CGA_PALETTE[14];
                 } else {
-                    cmap[1] = CGA_PALETTE[4];
-                    cmap[2] = CGA_PALETTE[5];
-                    cmap[3] = CGA_PALETTE[7];
+                    cmap[1] = CGA_PALETTE[2];
+                    cmap[2] = CGA_PALETTE[4];
+                    cmap[3] = CGA_PALETTE[6];
                 }
             }
         }

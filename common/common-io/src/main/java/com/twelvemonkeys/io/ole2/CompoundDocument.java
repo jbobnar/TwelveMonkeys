@@ -4,26 +4,28 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.io.ole2;
@@ -33,10 +35,13 @@ import com.twelvemonkeys.lang.StringUtil;
 
 import javax.imageio.stream.ImageInputStream;
 import java.io.*;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.UUID;
+
+import static com.twelvemonkeys.lang.Validate.notNull;
 
 /**
  * Represents a read-only OLE2 compound document.
@@ -50,7 +55,7 @@ import java.util.UUID;
  * @author last modified by $Author: haku $
  * @version $Id: //depot/branches/personal/haraldk/twelvemonkeys/release-2/twelvemonkeys-core/src/main/java/com/twelvemonkeys/io/ole2/CompoundDocument.java#4 $
  */
-public final class CompoundDocument {
+public final class CompoundDocument implements AutoCloseable {
     // TODO: Write support...
     // TODO: Properties: http://support.microsoft.com/kb/186898
     
@@ -94,13 +99,18 @@ public final class CompoundDocument {
 
     /**
      * Creates a (for now) read only {@code CompoundDocument}.
+     * <p/>
+     * <em>Warning! You must invoke {@link #close()} on the compound document
+     * created from this constructor when done, to avoid leaking file
+     * descriptors.</em>
      *
-     * @param pFile the file to read from
+     * @param file the file to read from
      *
      * @throws IOException if an I/O exception occurs while reading the header
      */
-    public CompoundDocument(final File pFile) throws IOException {
-        input = new LittleEndianRandomAccessFile(FileUtil.resolve(pFile), "r");
+    public CompoundDocument(final File file) throws IOException {
+        // TODO: We need to close this (or it's underlying RAF)! Otherwise we're leaking file descriptors!
+        input = new LittleEndianRandomAccessFile(FileUtil.resolve(file), "r");
 
         // TODO: Might be better to read header on first read operation?!
         // OTOH: It's also good to be fail-fast, so at least we should make
@@ -111,17 +121,17 @@ public final class CompoundDocument {
     /**
      * Creates a read only {@code CompoundDocument}.
      *
-     * @param pInput the input to read from
+     * @param pInput the input to read from.
      *
      * @throws IOException if an I/O exception occurs while reading the header
      */
     public CompoundDocument(final InputStream pInput) throws IOException {
-        this(new FileCacheSeekableStream(pInput));
+        this(new MemoryCacheSeekableStream(pInput));
     }
 
     // For testing only, consider exposing later
-    CompoundDocument(final SeekableInputStream pInput) throws IOException {
-        input = new SeekableLittleEndianDataInputStream(pInput);
+    CompoundDocument(final SeekableInputStream stream) throws IOException {
+        input = new SeekableLittleEndianDataInputStream(stream);
 
         // TODO: Might be better to read header on first read operation?!
         // OTOH: It's also good to be fail-fast, so at least we should make
@@ -132,17 +142,41 @@ public final class CompoundDocument {
     /**
      * Creates a read only {@code CompoundDocument}.
      *
-     * @param pInput the input to read from
+     * @param input the input to read from
      *
      * @throws IOException if an I/O exception occurs while reading the header
      */
-    public CompoundDocument(final ImageInputStream pInput) throws IOException {
-        input = pInput;
+    public CompoundDocument(final ImageInputStream input) throws IOException {
+        this.input = notNull(input, "input");
+
+        // This implementation only supports little endian (Intel) CompoundDocuments
+        input.setByteOrder(ByteOrder.LITTLE_ENDIAN);
 
         // TODO: Might be better to read header on first read operation?!
         // OTOH: It's also good to be fail-fast, so at least we should make
         // sure we're reading a valid document
         readHeader();
+    }
+
+    /**
+     * This method will close the underlying {@link RandomAccessFile} if any,
+     * but will leave any stream created outside the document open.
+     *
+     * @see #CompoundDocument(File)
+     * @see RandomAccessFile#close()
+     *
+     * @throws IOException if an I/O error occurs.
+     */
+    @Override
+    public void close() throws IOException {
+        if (input instanceof RandomAccessFile) {
+            ((RandomAccessFile) input).close();
+        }
+        else if (input instanceof LittleEndianRandomAccessFile) {
+            ((LittleEndianRandomAccessFile) input).close();
+        }
+
+        // Other streams are left open
     }
 
     public static boolean canRead(final DataInput pInput) {

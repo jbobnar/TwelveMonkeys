@@ -1,31 +1,36 @@
-package com.twelvemonkeys.imageio.plugins.tiff;/*
+/*
  * Copyright (c) 2012, Harald Kuhr
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+package com.twelvemonkeys.imageio.plugins.tiff;
+
+import com.twelvemonkeys.imageio.color.ColorSpaces;
 import com.twelvemonkeys.imageio.util.ImageReaderAbstractTest;
 import org.junit.Test;
 
@@ -38,8 +43,10 @@ import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
 import java.awt.*;
+import java.awt.color.ICC_ColorSpace;
 import java.awt.image.BufferedImage;
 import java.awt.image.Raster;
+import java.awt.image.WritableRaster;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -50,6 +57,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
 import static org.junit.internal.matchers.StringContains.containsString;
+import static org.mockito.AdditionalMatchers.and;
 import static org.mockito.Matchers.contains;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.*;
@@ -100,6 +108,7 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
                 new TestData(getClassLoaderResource("/tiff/scan-mono-iccgray.tif"), new Dimension(2408, 3436)), // B/W, PackBits w/gray ICC profile
                 new TestData(getClassLoaderResource("/tiff/planar-striped-lzw.tif"), new Dimension(229, 229)), // RGB 8 bit/sample, planar, LZW compression
                 new TestData(getClassLoaderResource("/tiff/colormap-with-extrasamples.tif"), new Dimension(10, 10)), // Palette, 8 bit/sample, 2 samples/pixel, extra samples, LZW
+                new TestData(getClassLoaderResource("/tiff/packbits-fillorder-2.tif"), new Dimension(3508, 2481)), // B/W, PackBits, FillOrder 2
                 // CCITT
                 new TestData(getClassLoaderResource("/tiff/ccitt/group3_1d.tif"), new Dimension(6, 4)), // B/W, CCITT T4 1D
                 new TestData(getClassLoaderResource("/tiff/ccitt/group3_1d_fill.tif"), new Dimension(6, 4)), // B/W, CCITT T4 1D
@@ -233,10 +242,16 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
         try (ImageInputStream stream = testData.getInputStream()) {
             TIFFImageReader reader = createReader();
             reader.setInput(stream);
+
+            IIOReadWarningListener warningListener = mock(IIOReadWarningListener.class);
+            reader.addIIOReadWarningListener(warningListener);
+
             BufferedImage image = reader.read(0);
 
             assertNotNull(image);
             assertEquals(testData.getDimension(0), new Dimension(image.getWidth(), image.getHeight()));
+            verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), contains("Old-style JPEG"));
+            verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), and(contains("JPEGInterchangeFormat"), contains("Offsets")));
         }
     }
 
@@ -255,7 +270,7 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
 
             assertNotNull(image);
             assertEquals(testData.getDimension(0), new Dimension(image.getWidth(), image.getHeight()));
-            verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), contains("JPEGInterchangeFormatLength"));
+            verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), contains("Old-style JPEG"));
         }
     }
 
@@ -274,7 +289,26 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
 
             assertNotNull(image);
             assertEquals(testData.getDimension(0), new Dimension(image.getWidth(), image.getHeight()));
-            verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), contains("JPEG"));
+            verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), and(contains("Old-style JPEG"), contains("tables")));
+        }
+    }
+
+    @Test
+    public void testReadOldStyleWangMultiStrip() throws IOException {
+        TestData testData = new TestData(getClassLoaderResource("/tiff/old-style-jpeg-multiple-strips.tif"), new Dimension(1571, 2339));
+
+        try (ImageInputStream stream = testData.getInputStream()) {
+            TIFFImageReader reader = createReader();
+            reader.setInput(stream);
+
+            IIOReadWarningListener warningListener = mock(IIOReadWarningListener.class);
+            reader.addIIOReadWarningListener(warningListener);
+
+            BufferedImage image = reader.read(0);
+
+            assertNotNull(image);
+            assertEquals(testData.getDimension(0), new Dimension(image.getWidth(), image.getHeight()));
+            verify(warningListener, atLeastOnce()).warningOccurred(eq(reader), and(contains("Old-style JPEG"), contains("tables")));
         }
     }
 
@@ -300,7 +334,7 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
     @Test
     public void testReadYCbCrJPEGAssumedRGB() throws IOException {
         // Problematic test data, which is YCbCr encoded (as correctly specified by the PhotometricInterpretation tag,
-        // but the JPEGImageReader will detect the data as RGB due to non-subsampled data and SOF ids.
+        // but the JPEGImageReader will detect the data as RGB due to non-subsampled data and SOF ids).
         TestData testData = new TestData(getClassLoaderResource("/tiff/xerox-jpeg-ycbcr-weird-coefficients.tif"), new Dimension(2482, 3520));
 
         try (ImageInputStream stream = testData.getInputStream()) {
@@ -308,32 +342,65 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
             reader.setInput(stream);
 
             ImageReadParam param = reader.getDefaultReadParam();
-            // TODO: There's a bug in reading with source region for the raster case...
-//            param.setSourceRegion(new Rectangle(8, 8));
+            param.setSourceRegion(new Rectangle(8, 8));
             BufferedImage image = reader.read(0, param);
 
             assertNotNull(image);
-//            assertEquals(new Dimension(8, 8), new Dimension(image.getWidth(), image.getHeight()));
-            assertEquals(testData.getDimension(0), new Dimension(image.getWidth(), image.getHeight()));
+            assertEquals(new Dimension(8, 8), new Dimension(image.getWidth(), image.getHeight()));
 
-            // The pixel at 0, 0 should be white(-ish), not red!
+            // The pixel at x, y should be white(-ish), not red!
             // NOTE: The image contains some weird custom YCbCr coefficients, which are roughly
-            // 0.299, 0.587, 0.144, instead of the standard 0.299, 0.587, 0.114 (the last/blue coefficient differs)
-            // this will make the background bright purple, rather than pure white as it would have been
+            // 0.299, 0.587, 0.144, instead of the standard 0.299, 0.587, 0.114 (the last/blue coefficient differs).
+            // This will make the background bright purple, rather than pure white as it would have been
             // with standard coefficients. Could be a typo/bug in the encoder or intentional.
             // Some/most software ignores the custom coefficients, and decodes the image as white background...
-            int argb = image.getRGB(0, 0);
-            assertEquals("Alpha", 0xff, (argb >>> 24) & 0xff);
-            assertEquals("Red", 0xff, (argb >> 16) & 0xff);
-            assertEquals("Green", 0xf2, (argb >> 8) & 0xff);
-            assertEquals("Blue", 0xff, argb & 0xff);
+            for (int y = 0; y < 8; y++) {
+                for (int x = 0; x < 8; x++) {
+                    int argb = image.getRGB(x, y);
+                    assertEquals("Alpha", 0xff, (argb >>> 24) & 0xff);
+                    assertEquals("Red", 0xff, (argb >> 16) & 0xff);
+                    assertEquals("Green", 0xff, (argb >> 8) & 0xff, 13); // Depending on coeffs
+                    assertEquals("Blue", 0xff, argb & 0xff);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testReadRGBJPEGAssumedYCbCr() throws IOException {
+        // Problematic test data, which is RGB encoded (as correctly specified by the PhotometricInterpretation tag,
+        // but the JPEGImageReader will detect the data as YCbCr).
+        // There is also bogus YCbCrSubSampling fields in the TIFF structure.
+        TestData testData = new TestData(getClassLoaderResource("/tiff/twain-rgb-jpeg-with-bogus-ycbcr-subsampling.tif"), new Dimension(850, 1100));
+
+        try (ImageInputStream stream = testData.getInputStream()) {
+            TIFFImageReader reader = createReader();
+            reader.setInput(stream);
+
+            ImageReadParam param = reader.getDefaultReadParam();
+            param.setSourceRegion(new Rectangle(8, 8));
+            BufferedImage image = reader.read(0, param);
+
+            assertNotNull(image);
+            assertEquals(new Dimension(8, 8), new Dimension(image.getWidth(), image.getHeight()));
+
+            // The pixel at x, y should be white, not pink!
+            for (int y = 0; y < 8; y++) {
+                for (int x = 0; x < 8; x++) {
+                    int argb = image.getRGB(x, y);
+                    assertEquals("Alpha", 0xff, (argb >>> 24) & 0xff);
+                    assertEquals("Red", 0xff, (argb >> 16) & 0xff);
+                    assertEquals("Green", 0xff, (argb >> 8) & 0xff);
+                    assertEquals("Blue", 0xff, argb & 0xff);
+                }
+            }
         }
     }
 
     @Test
     public void testReadJPEGRasterCaseWithSrcRegion() throws IOException {
         // Problematic test data, which is YCbCr encoded (as correctly specified by the PhotometricInterpretation tag,
-        // but the JPEGImageReader will detect the data as RGB due to non-subsampled data and SOF ids.
+        // but the JPEGImageReader will detect the data as RGB due to non-subsampled data and SOF ids).
         TestData testData = new TestData(getClassLoaderResource("/tiff/xerox-jpeg-ycbcr-weird-coefficients.tif"), new Dimension(2482, 3520));
 
         try (ImageInputStream stream = testData.getInputStream()) {
@@ -497,6 +564,83 @@ public class TIFFImageReaderTest extends ImageReaderAbstractTest<TIFFImageReader
                 reader.read(0);
             }
             assertTrue("no correct guess for PhotometricInterpretation: " + results[i], foundWarning.get());
+        }
+    }
+
+    @Test
+    public void testReadMultipleExtraSamples() throws IOException {
+        ImageReader reader = createReader();
+        try (ImageInputStream stream = ImageIO.createImageInputStream(getClassLoaderResource("/tiff/pack.tif"))) {
+            reader.setInput(stream);
+
+            ImageReadParam param = reader.getDefaultReadParam();
+
+            BufferedImage image = null;
+            try {
+                param.setSourceRegion(new Rectangle(192, 64));
+                image = reader.read(0, param);
+            }
+            catch (IOException e) {
+                failBecause("Image could not be read", e);
+            }
+
+            assertNotNull(image);
+            assertEquals(192, image.getWidth());
+            assertEquals(64, image.getHeight());
+
+            assertEquals(0x00, image.getRGB(0, 0)); // Should be all transparent
+            assertEquals(0xff, (image.getRGB(150, 50) & 0xff000000) >>> 24, 2); // For some reason, it's not all transparent
+        }
+    }
+
+    @Test
+    public void testAlphaRasterForMultipleExtraSamples() throws IOException {
+        ImageReader reader = createReader();
+        try (ImageInputStream stream = ImageIO.createImageInputStream(getClassLoaderResource("/tiff/extra-channels.tif"))) {
+            reader.setInput(stream);
+
+            BufferedImage image = reader.read(0);
+            assertNotNull(image);
+
+            assertEquals(0x00, image.getRGB(0, 0));
+            assertEquals(0xf5, (image.getRGB(50, 50) & 0xff000000) >>> 24);
+
+            int[] alpha = new int[1];
+            WritableRaster alphaRaster = image.getAlphaRaster();
+            assertEquals(0x00, alphaRaster.getPixel(0, 0, alpha)[0]);
+            assertEquals(0xf5,  alphaRaster.getPixel(50, 50, alpha)[0]);
+        }
+    }
+
+    @Test
+    public void testReadCMYKExtraSamples() throws IOException {
+        ImageReader reader = createReader();
+        try (ImageInputStream stream = ImageIO.createImageInputStream(getClassLoaderResource("/tiff/cmyk-with-non-alpha-extra-channel.tiff"))) {
+            reader.setInput(stream);
+
+            ImageReadParam param = reader.getDefaultReadParam();
+
+            BufferedImage image = null;
+            try {
+                image = reader.read(0, param);
+            }
+            catch (IOException e) {
+                failBecause("Image could not be read", e);
+            }
+
+            assertNotNull(image);
+            assertEquals(160, image.getWidth());
+            assertEquals(227, image.getHeight());
+
+            // This TIFF does not contain a ICC profile, making the RGB result depend on the platforms "Generic CMYK" profile
+            if (ColorSpaces.getColorSpace(ColorSpaces.CS_GENERIC_CMYK) instanceof ICC_ColorSpace) {
+                assertRGBEquals("Wrong RGB (0,0)", 0xff1E769D, image.getRGB(0, 0), 4);
+                assertRGBEquals("Wrong RGB (159,226)", 0xff1E769D, image.getRGB(159, 226), 4);
+            }
+            else {
+                assertRGBEquals("Wrong RGB (0,0)", 0xff2896d9, image.getRGB(0, 0), 4);
+                assertRGBEquals("Wrong RGB (159,226)", 0xff2896d9, image.getRGB(159, 226), 4);
+            }
         }
     }
 

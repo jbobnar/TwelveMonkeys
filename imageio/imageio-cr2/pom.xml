@@ -33,7 +33,7 @@
     <parent>
         <artifactId>imageio</artifactId>
         <groupId>com.twelvemonkeys.imageio</groupId>
-        <version>3.4.1</version>
+        <version>3.5.1</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <version>${project.version}</version>
@@ -55,7 +55,7 @@
             <artifactId>imageio-metadata</artifactId>
         </dependency>
         <dependency>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-jpeg</artifactId>
         </dependency>

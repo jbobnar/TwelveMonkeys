@@ -4,26 +4,28 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.imageio.util;
@@ -193,6 +195,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         for (TestData data : getTestData()) {
             reader.setInput(data.getInputStream());
         }
+
+        reader.dispose();
     }
 
     @Test
@@ -201,6 +205,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         ImageReader reader = createReader();
         assertNotNull(reader);
         reader.setInput(null);
+        reader.dispose();
     }
 
     @Test
@@ -233,6 +238,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 );
             }
         }
+
+        reader.dispose();
     }
 
     @Test
@@ -252,6 +259,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             failBecause("Image could not be read", e);
         }
         assertNull(image);
+
+        reader.dispose();
     }
 
     @Test
@@ -271,6 +280,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             failBecause("Image could not be read", e);
         }
         assertNull(image);
+
+        reader.dispose();
     }
 
     @Test
@@ -289,6 +300,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             failBecause("Image could not be read", e);
         }
         assertNull(image);
+
+        reader.dispose();
     }
 
     @Test
@@ -307,6 +320,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         assertEquals(first.getType(), second.getType());
         assertEquals(first.getWidth(), second.getWidth());
         assertEquals(first.getHeight(), second.getHeight());
+
+        reader.dispose();
     }
 
     @Test
@@ -327,6 +342,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         }
 
         assertNull(image);
+
+        reader.dispose();
     }
 
     @Test
@@ -337,7 +354,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
 
         BufferedImage image = null;
         try {
-            image = reader.read(99, reader.getDefaultReadParam());
+            image = reader.read(Short.MAX_VALUE, reader.getDefaultReadParam());
             fail("Read image with index out of bounds");
         }
         catch (IndexOutOfBoundsException ignore) {
@@ -347,6 +364,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         }
 
         assertNull(image);
+
+        reader.dispose();
     }
 
     @Test
@@ -366,6 +385,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         }
 
         assertNull(image);
+
+        reader.dispose();
     }
 
     @Test
@@ -385,6 +406,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         assertNotNull("Image was null!", image);
         assertEquals("Read image has wrong width: " + image.getWidth(), data.getDimension(0).width, image.getWidth());
         assertEquals("Read image has wrong height: " + image.getHeight(), data.getDimension(0).height, image.getHeight());
+
+        reader.dispose();
     }
 
     @Test
@@ -404,6 +427,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         assertNotNull("Image was null!", image);
         assertEquals("Read image has wrong width: " + image.getWidth(), data.getDimension(0).width, image.getWidth());
         assertEquals("Read image has wrong height: " + image.getHeight(), data.getDimension(0).height, image.getHeight());
+
+        reader.dispose();
     }
 
     @Test
@@ -423,6 +448,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         assertNotNull("Image was null!", image);
         assertEquals("Read image has wrong width: " + image.getWidth(), data.getDimension(0).width, image.getWidth());
         assertEquals("Read image has wrong height: " + image.getHeight(), data.getDimension(0).height, image.getHeight());
+
+        reader.dispose();
     }
 
     @Test
@@ -447,6 +474,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             assertEquals("Read image has wrong width: " + image.getWidth(), 10, image.getWidth());
             assertEquals("Read image has wrong height: " + image.getHeight(), 10, image.getHeight());
         }
+
+        reader.dispose();
     }
 
     @Test
@@ -469,6 +498,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         assertNotNull("Image was null!", image);
         assertEquals("Read image has wrong width: ", (data.getDimension(0).width + 4) / 5, image.getWidth());
         assertEquals("Read image has wrong height: ", (data.getDimension(0).height + 4) / 5, image.getHeight());
+
+        reader.dispose();
     }
 
     @Test
@@ -492,6 +523,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         }
 
         assertSubsampledImageDataEquals("Subsampled image data does not match expected", image, subsampled, param);
+
+        reader.dispose();
     }
 
     // TODO: Subsample all test data
@@ -540,7 +573,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         }
     }
 
-    protected final void assertImageDataEquals(String message, BufferedImage expected, BufferedImage actual) {
+    public static void assertImageDataEquals(String message, BufferedImage expected, BufferedImage actual) {
         assertNotNull("Expected image was null", expected);
         assertNotNull("Actual image was null!", actual);
 
@@ -581,6 +614,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         assertNotNull("Image was null!", image);
         assertEquals("Read image has wrong width: " + image.getWidth(), 10, image.getWidth());
         assertEquals("Read image has wrong height: " + image.getHeight(), 10, image.getHeight());
+
+        reader.dispose();
     }
 
     @Test
@@ -619,6 +654,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         assertEquals("Read image has wrong width: " + image.getWidth(), r.width, image.getWidth());
         assertEquals("Read image has wrong height: " + image.getHeight(), r.height, image.getHeight());
         assertImageDataEquals("Images differ", roi, image);
+
+        reader.dispose();
     }
 
     @Test
@@ -648,6 +685,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             assertEquals("Read image has wrong width: " + image.getWidth(), 10, image.getWidth());
             assertEquals("Read image has wrong height: " + image.getHeight(), 10, image.getHeight());
         }
+
+        reader.dispose();
     }
 
     @Test
@@ -673,6 +712,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         assertEquals("Read image has wrong width: " + image.getWidth(), 5, image.getWidth());
         assertEquals("Read image has wrong height: " + image.getHeight(), 5, image.getHeight());
 
+        reader.dispose();
     }
 
     @Test
@@ -692,7 +732,10 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IOException e) {
             failBecause("Image could not be read", e);
         }
+
         assertNull(image);
+
+        reader.dispose();
     }
 
     @Test
@@ -716,7 +759,10 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IOException e) {
             failBecause("Image could not be read", e);
         }
+
         assertNull(image);
+
+        reader.dispose();
     }
 
     @Test
@@ -724,9 +770,9 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         ImageReader reader = createReader();
         // Do not set input
 
-        BufferedImage image = null;
+        RenderedImage image = null;
         try {
-            image = reader.read(0, reader.getDefaultReadParam());
+            image = reader.readAsRenderedImage(0, reader.getDefaultReadParam());
             fail("Read image with no input");
         }
         catch (IllegalStateException expected) {
@@ -735,7 +781,10 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IOException e) {
             failBecause("Image could not be read", e);
         }
+
         assertNull(image);
+
+        reader.dispose();
     }
 
     @Test
@@ -751,11 +800,14 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IOException e) {
             failBecause("Image could not be read", e);
         }
+
         assertNotNull("Image was null!", image);
         assertEquals("Read image has wrong width: " + image.getWidth(),
                 data.getDimension(0).width, image.getWidth());
         assertEquals("Read image has wrong height: " + image.getHeight(),
                 data.getDimension(0).height, image.getHeight());
+
+        reader.dispose();
     }
 
     @Test
@@ -771,11 +823,14 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IOException e) {
             failBecause("Image could not be read", e);
         }
+
         assertNotNull("Image was null!", image);
         assertEquals("Read image has wrong width: " + image.getWidth(),
                 data.getDimension(0).width, image.getWidth());
         assertEquals("Read image has wrong height: " + image.getHeight(),
                 data.getDimension(0).height, image.getHeight());
+
+        reader.dispose();
     }
 
     @Test
@@ -783,6 +838,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         ImageReader reader = createReader();
         ImageReadParam param = reader.getDefaultReadParam();
         assertNotNull(param);
+        reader.dispose();
     }
 
     @Test
@@ -798,6 +854,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             fail(e.getMessage());
         }
         assertNotNull(name);
+        reader.dispose();
     }
 
     @Test
@@ -813,6 +870,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IllegalStateException ignore) {
         }
         assertEquals(0, num);
+        reader.dispose();
     }
 
     @Test
@@ -826,6 +884,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IllegalStateException ignore) {
         }
         assertEquals(0, num);
+        reader.dispose();
     }
 
     @Test
@@ -854,6 +913,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         if (data.getImageCount() != num) {
             System.err.println("WARNING: Image count not equal to test data count");
         }
+        reader.dispose();
     }
 
     @Test
@@ -881,6 +941,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             fail(e.getMessage());
         }
         assertEquals(-1, num);
+        reader.dispose();
     }
 
     @Test
@@ -897,6 +958,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             fail("Could not read image width: " + e);
         }
         assertEquals("Wrong width reported", data.getDimension(0).width, width);
+        reader.dispose();
     }
 
     @Test
@@ -917,6 +979,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IOException e) {
             fail("Could not read image aspect ratio: " + e);
         }
+        reader.dispose();
     }
 
     @Test
@@ -934,6 +997,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             fail("Could not read image width: " + e);
         }
         assertEquals("Wrong width reported", 0, width);
+        reader.dispose();
     }
 
     @Test
@@ -950,6 +1014,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             fail("Could not read image height: " + e);
         }
         assertEquals("Wrong height reported", data.getDimension(0).height, height);
+        reader.dispose();
     }
 
     @Test
@@ -967,6 +1032,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             fail("Could not read image height: " + e);
         }
         assertEquals("Wrong height reported", 0, height);
+        reader.dispose();
     }
 
     @Test
@@ -987,6 +1053,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IOException e) {
             fail("Could not read image height: " + e);
         }
+        reader.dispose();
     }
 
     @Test
@@ -1004,6 +1071,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         }
         Dimension d = data.getDimension(0);
         assertEquals("Wrong aspect aspect ratio", d.getWidth() / d.getHeight(), aspectRatio, 0.001);
+        reader.dispose();
     }
 
     @Test
@@ -1021,6 +1089,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             fail("Could not read image aspect ratio" + e);
         }
         assertEquals("Wrong aspect aspect ratio", 0f, aspectRatio, 0f);
+        reader.dispose();
     }
 
     @Test
@@ -1041,6 +1110,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IOException e) {
             fail("Could not read image aspect ratio" + e);
         }
+        reader.dispose();
     }
 
     @Test
@@ -1061,12 +1131,14 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
     public void testAddIIOReadProgressListener() {
         ImageReader reader = createReader();
         reader.addIIOReadProgressListener(mock(IIOReadProgressListener.class));
+        reader.dispose();
     }
 
     @Test
     public void testAddIIOReadProgressListenerNull() {
         ImageReader reader = createReader();
         reader.addIIOReadProgressListener(null);
+        reader.dispose();
     }
 
     @Test
@@ -1090,6 +1162,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         ordered.verify(listener).imageStarted(reader, 0);
         ordered.verify(listener, atLeastOnce()).imageProgress(eq(reader), anyInt());
         ordered.verify(listener).imageComplete(reader);
+        reader.dispose();
     }
 
     @Test
@@ -1127,18 +1200,21 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         ordered.verify(listener).imageComplete(reader);
         ordered.verify(listenerToo).imageComplete(reader);
         ordered.verify(listenerThree).imageComplete(reader);
+        reader.dispose();
     }
 
     @Test
     public void testRemoveIIOReadProgressListenerNull() {
         ImageReader reader = createReader();
         reader.removeIIOReadProgressListener(null);
+        reader.dispose();
     }
 
     @Test
     public void testRemoveIIOReadProgressListenerNone() {
         ImageReader reader = createReader();
         reader.removeIIOReadProgressListener(mock(IIOReadProgressListener.class));
+        reader.dispose();
     }
 
     @Test
@@ -1160,6 +1236,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
 
         // Should not have called any methods...
         verifyZeroInteractions(listener);
+        reader.dispose();
     }
 
     @Test
@@ -1191,6 +1268,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         ordered.verify(listenerToo).imageStarted(reader, 0);
         ordered.verify(listenerToo, atLeastOnce()).imageProgress(eq(reader), anyInt());
         ordered.verify(listenerToo).imageComplete(reader);
+        reader.dispose();
     }
 
     @Test
@@ -1213,6 +1291,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
 
         // Should not have called any methods...
         verifyZeroInteractions(listener);
+        reader.dispose();
     }
 
     @Test
@@ -1239,6 +1318,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         // Should not have called any methods...
         verifyZeroInteractions(listener);
         verifyZeroInteractions(listenerToo);
+        reader.dispose();
     }
 
     @Test
@@ -1275,6 +1355,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
 
         verify(listener).readAborted(reader);
         verify(listenerToo).readAborted(reader);
+        reader.dispose();
     }
 
     @Test
@@ -1308,6 +1389,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
 
             assertTrue("ImageTypeSepcifier from getRawImageType should be in the iterator from getImageTypes", rawFound);
         }
+        reader.dispose();
     }
 
     @Test
@@ -1335,6 +1417,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             assertSame(destination.getRaster(), result.getRaster());
             assertSame(destination.getColorModel(), result.getColorModel());
         }
+        reader.dispose();
     }
 
     @Test
@@ -1365,6 +1448,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         else {
             System.err.println("WARNING: Test skipped due to reader.getRawImageType(0) returning null");
         }
+        reader.dispose();
     }
 
     @Test
@@ -1401,7 +1485,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                                 destination.getType() == BufferedImage.TYPE_BYTE_INDEXED) &&
                                 message.contains("indexcolormodel")))) {
                     failBecause(
-                        "Wrong message: " + message + " for type " + destination.getType(), expected
+                            "Wrong message: " + message + " for type " + destination.getType(), expected
                     );
                 }
             }
@@ -1410,6 +1494,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 assertTrue("Wrong message: " + message, message.contains("dest"));
             }
         }
+        reader.dispose();
     }
 
     @Test
@@ -1431,12 +1516,14 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
             catch (IIOException | IllegalArgumentException expected) {
                 // TODO: This is thrown by ImageReader.getDestination. But are we happy with that?
                 String message = expected.getMessage().toLowerCase();
-                if (!(message.contains("destination") && message.contains("type"))) {
-                    // Allow this to bubble up, du to a bug in the Sun PNGImageReader
+                if (!(message.contains("destination") && message.contains("type")
+                        || message.contains("num source & dest bands differ"))) {
+                    // Allow this to bubble up, due to a bug in the Sun PNGImageReader
                     throw expected;
                 }
             }
         }
+        reader.dispose();
     }
 
     private List<ImageTypeSpecifier> createIllegalTypes(Iterator<ImageTypeSpecifier> pValidTypes) {
@@ -1482,6 +1569,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         assertNotNull(image);
         assertEquals(reader.getWidth(0) + point.x, image.getWidth());
         assertEquals(reader.getHeight(0) + point.y, image.getHeight());
+        reader.dispose();
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -1499,6 +1587,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         catch (IllegalArgumentException e) {
             assertTrue(e.getMessage().toLowerCase().contains("offset"));
         }
+        reader.dispose();
     }
 
     @Test
@@ -1540,6 +1629,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 assertEquals(expectedModel.getSampleSize(i), resultModel.getSampleSize(i));
             }
         }
+        reader.dispose();
     }
 
     @Test
@@ -1553,17 +1643,11 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
 
         assertNotSame("Multiple reads return same (mutable) image", one, two);
 
-        Graphics2D g = one.createGraphics();
-        try {
-            g.setColor(Color.WHITE);
-            g.setXORMode(Color.BLACK);
-            g.fillRect(0, 0, one.getWidth(), one.getHeight());
-        }
-        finally {
-            g.dispose();
-        }
+        one.setRGB(0, 0, Color.BLUE.getRGB());
+        two.setRGB(0, 0, Color.RED.getRGB());
 
         assertTrue(one.getRGB(0, 0) != two.getRGB(0, 0));
+        reader.dispose();
     }
 
     @Test
@@ -1606,6 +1690,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
 
             fail("No thumbnails tested for reader that supports thumbnails.");
         }
+        reader.dispose();
     }
 
     @Ignore("TODO: Implement")
@@ -1636,6 +1721,7 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
         if (streamMetadata != null) {
             assertEquals(provider.getNativeStreamMetadataFormatName(), streamMetadata.getNativeMetadataFormatName());
         }
+        reader.dispose();
     }
 
     protected URL getClassLoaderResource(final String pName) {

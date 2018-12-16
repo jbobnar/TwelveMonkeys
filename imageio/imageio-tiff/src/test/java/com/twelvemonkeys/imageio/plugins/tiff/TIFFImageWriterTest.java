@@ -4,26 +4,28 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.imageio.plugins.tiff;
@@ -34,7 +36,7 @@ import com.twelvemonkeys.imageio.metadata.tiff.Rational;
 import com.twelvemonkeys.imageio.metadata.tiff.TIFF;
 import com.twelvemonkeys.imageio.metadata.tiff.TIFFReader;
 import com.twelvemonkeys.imageio.stream.ByteArrayImageInputStream;
-import com.twelvemonkeys.imageio.util.ImageWriterAbstractTestCase;
+import com.twelvemonkeys.imageio.util.ImageWriterAbstractTest;
 import com.twelvemonkeys.io.FastByteArrayOutputStream;
 import com.twelvemonkeys.io.NullOutputStream;
 import org.junit.Test;
@@ -45,14 +47,14 @@ import javax.imageio.event.IIOWriteProgressListener;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.metadata.IIOMetadataFormatImpl;
 import javax.imageio.metadata.IIOMetadataNode;
+import javax.imageio.stream.FileCacheImageOutputStream;
+import javax.imageio.stream.FileImageOutputStream;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.URL;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -72,7 +74,7 @@ import static org.mockito.Mockito.*;
  * @author last modified by $Author: haraldk$
  * @version $Id: TIFFImageWriterTest.java,v 1.0 19.09.13 13:22 haraldk Exp$
  */
-public class TIFFImageWriterTest extends ImageWriterAbstractTestCase {
+public class TIFFImageWriterTest extends ImageWriterAbstractTest {
 
     private static final TIFFImageWriterSpi PROVIDER = new TIFFImageWriterSpi();
 
@@ -288,6 +290,27 @@ public class TIFFImageWriterTest extends ImageWriterAbstractTestCase {
         assertEquals(softwareString, software.getValueAsString());
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void testWriteIncompatibleCompression() throws IOException {
+        ImageWriter writer = createImageWriter();
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+
+        try (ImageOutputStream output = ImageIO.createImageOutputStream(buffer)) {
+            writer.setOutput(output);
+
+            try {
+                ImageWriteParam param = writer.getDefaultWriteParam();
+                param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                param.setCompressionType("CCITT T.6");
+                writer.write(null, new IIOImage(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB), null, null), param);
+                fail();
+            }
+            catch (IOException e) {
+                fail(e.getMessage());
+            }
+        }
+    }
+
     @Test
     public void testWriterCanWriteSequence() {
         ImageWriter writer = createImageWriter();
@@ -316,23 +339,121 @@ public class TIFFImageWriterTest extends ImageWriterAbstractTestCase {
         }
     }
 
+    private void assertWriteSequence(Class<? extends ImageOutputStream> iosClass, String... compression) throws IOException {
+        BufferedImage image = new BufferedImage(13, 13, BufferedImage.TYPE_BYTE_GRAY);
+
+        Graphics2D g2d = image.createGraphics();
+        try {
+            g2d.setColor(Color.WHITE);
+            g2d.fillRect(image.getWidth() / 4, image.getHeight() / 4, image.getWidth() / 2, image.getHeight() / 2);
+        }
+        finally {
+            g2d.dispose();
+        }
+
+        boolean isFileDirect = iosClass == FileImageOutputStream.class;
+        Object destination = isFileDirect
+                             ? File.createTempFile("temp-", ".tif")
+                             : new ByteArrayOutputStream(1024);
+
+        ImageWriter writer = createImageWriter();
+        try (ImageOutputStream output = isFileDirect
+                                        ? new FileImageOutputStream((File) destination)
+                                        : new FileCacheImageOutputStream((OutputStream) destination, ImageIO.getCacheDirectory())) {
+            writer.setOutput(output);
+
+            ImageWriteParam params = writer.getDefaultWriteParam();
+            params.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+
+            try {
+                writer.prepareWriteSequence(null);
+
+                for (String compressionType : compression) {
+                    params.setCompressionType(compressionType);
+                    writer.writeToSequence(new IIOImage(image, null, null), params);
+                }
+
+                writer.endWriteSequence();
+            }
+            catch (IOException e) {
+                fail(e.getMessage());
+            }
+        }
+
+        try (ImageInputStream input = ImageIO.createImageInputStream(isFileDirect
+                                                                     ? destination
+                                                                     : new ByteArrayInputStream(((ByteArrayOutputStream) destination).toByteArray()))) {
+            ImageReader reader = ImageIO.getImageReaders(input).next();
+            reader.setInput(input);
+
+            assertEquals("wrong image count", compression.length, reader.getNumImages(true));
+
+            for (int i = 0; i < reader.getNumImages(true); i++) {
+                assertImageEquals("image " + i + " differs", image, reader.read(i), 5); // Allow room for JPEG compression
+            }
+        }
+    }
+
+    @Test
+    public void testWriteSequenceFileImageOutputStreamUncompressed() throws IOException {
+        assertWriteSequence(FileImageOutputStream.class, "None", "None");
+    }
+
+    @Test
+    public void testWriteSequenceFileImageOutputCompressed() throws IOException {
+        assertWriteSequence(FileImageOutputStream.class, "LZW", "Deflate");
+    }
+
+    @Test
+    public void testWriteSequenceFileImageOutputStreamUncompressedCompressed() throws IOException {
+        assertWriteSequence(FileImageOutputStream.class, "None", "LZW", "None");
+    }
+
+    @Test
+    public void testWriteSequenceFileImageOutputStreamCompressedUncompressed() throws IOException {
+        assertWriteSequence(FileImageOutputStream.class, "Deflate", "None", "Deflate");
+    }
+
+    @Test
+    public void testWriteSequenceFileCacheImageOutputStreamUncompressed() throws IOException {
+        assertWriteSequence(FileCacheImageOutputStream.class, "None", "None");
+    }
+
+    @Test
+    public void testWriteSequenceFileCacheImageOutputStreamCompressed() throws IOException {
+        assertWriteSequence(FileCacheImageOutputStream.class, "Deflate", "LZW");
+    }
+
+    @Test
+    public void testWriteSequenceFileCacheImageOutputStreamCompressedUncompressed() throws IOException {
+        assertWriteSequence(FileCacheImageOutputStream.class, "LZW", "None", "LZW");
+    }
+
+    @Test
+    public void testWriteSequenceFileCacheImageOutputStreamUncompressedCompressed() throws IOException {
+        assertWriteSequence(FileCacheImageOutputStream.class, "None", "Deflate", "None");
+    }
+
     @Test
     public void testWriteSequence() throws IOException {
         BufferedImage[] images = new BufferedImage[] {
                 new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB),
-                new BufferedImage(110, 100, BufferedImage.TYPE_INT_RGB),
+                new BufferedImage(110, 100, BufferedImage.TYPE_3BYTE_BGR),
                 new BufferedImage(120, 100, BufferedImage.TYPE_INT_RGB),
-                new BufferedImage(130, 100, BufferedImage.TYPE_INT_RGB)
+                new BufferedImage(140, 100, BufferedImage.TYPE_INT_ARGB),
+                new BufferedImage(130, 100, BufferedImage.TYPE_BYTE_GRAY),
+                new BufferedImage(150, 100, BufferedImage.TYPE_BYTE_BINARY),
+                new BufferedImage(160, 100, BufferedImage.TYPE_BYTE_BINARY)
         };
 
-        Color[] colors = new Color[] {Color.RED, Color.GREEN, Color.BLUE, Color.ORANGE};
+        Color[] colors = new Color[] {Color.RED, Color.GREEN, Color.BLUE, Color.ORANGE, Color.PINK, Color.WHITE, Color.GRAY};
 
         for (int i = 0; i < images.length; i++) {
             BufferedImage image = images[i];
             Graphics2D g2d = image.createGraphics();
             try {
                 g2d.setColor(colors[i]);
-                g2d.fillRect(0, 0, 100, 100);
+                g2d.fillRect(0, 0, image.getWidth(), image.getHeight());
             }
             finally {
                 g2d.dispose();
@@ -350,17 +471,26 @@ public class TIFFImageWriterTest extends ImageWriterAbstractTestCase {
             try {
                 writer.prepareWriteSequence(null);
 
-                params.setCompressionType("JPEG");
+                params.setCompressionType("LZW");
                 writer.writeToSequence(new IIOImage(images[0], null, null), params);
 
                 params.setCompressionType("None");
                 writer.writeToSequence(new IIOImage(images[1], null, null), params);
 
-                params.setCompressionType("None");
+                params.setCompressionType("JPEG");
                 writer.writeToSequence(new IIOImage(images[2], null, null), params);
 
                 params.setCompressionType("PackBits");
                 writer.writeToSequence(new IIOImage(images[3], null, null), params);
+
+                params.setCompressionType("Deflate");
+                writer.writeToSequence(new IIOImage(images[4], null, null), params);
+
+                params.setCompressionType("CCITT T.4");
+                writer.writeToSequence(new IIOImage(images[5], null, null), params);
+
+                params.setCompressionType("CCITT T.6");
+                writer.writeToSequence(new IIOImage(images[6], null, null), params);
 
                 writer.endWriteSequence();
             }
@@ -376,12 +506,7 @@ public class TIFFImageWriterTest extends ImageWriterAbstractTestCase {
             assertEquals("wrong image count", images.length, reader.getNumImages(true));
 
             for (int i = 0; i < reader.getNumImages(true); i++) {
-                BufferedImage image = reader.read(i);
-
-                assertEquals(images[i].getWidth(), image.getWidth());
-                assertEquals(images[i].getHeight(), image.getHeight());
-
-                assertRGBEquals("RGB differ", images[i].getRGB(0, 0), image.getRGB(0, 0), 5); // Allow room for JPEG compression
+                assertImageEquals("image " + i + " differs", images[i], reader.read(i), 5); // Allow room for JPEG compression
             }
         }
     }
@@ -423,6 +548,30 @@ public class TIFFImageWriterTest extends ImageWriterAbstractTestCase {
                 }
 
                 writer.endWriteSequence();
+            }
+            catch (IOException e) {
+                fail(e.getMessage());
+            }
+        }
+    }
+
+    @Test
+    public void testWriteParamJPEGQuality() throws IOException {
+        ImageWriter writer = createImageWriter();
+
+        try (ImageOutputStream output = ImageIO.createImageOutputStream(new NullOutputStream())) {
+            writer.setOutput(output);
+
+            try {
+                ImageWriteParam param = writer.getDefaultWriteParam();
+                // Make sure that the JPEG delegation outputs the correct indexes
+                param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                param.setCompressionType("JPEG");
+                param.setCompressionQuality(.1f);
+
+                writer.write(null, new IIOImage(new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB), null, null), param);
+
+                // In a perfect world, we should verify that the parameter was passed to the JPEG delegate...
             }
             catch (IOException e) {
                 fail(e.getMessage());

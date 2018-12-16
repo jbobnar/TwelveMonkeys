@@ -4,26 +4,28 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.imageio.plugins.tiff;
@@ -132,16 +134,9 @@ public final class TIFFImageWriter extends ImageWriterBase {
 
     @Override
     public void write(final IIOMetadata streamMetadata, final IIOImage image, final ImageWriteParam param) throws IOException {
-        assertOutput();
-        configureStreamByteOrder(streamMetadata, imageOutput);
-
-        // TODO: Make TIFFEntry and possibly TIFFDirectory? public
-        TIFFWriter tiffWriter = new TIFFWriter();
-        tiffWriter.writeTIFFHeader(imageOutput);
-
-        writePage(0, image, param, tiffWriter, imageOutput.getStreamPosition());
-
-        imageOutput.flush();
+        prepareWriteSequence(streamMetadata);
+        writeToSequence(image, param);
+        endWriteSequence();
     }
 
     private long writePage(int imageIndex, IIOImage image, ImageWriteParam param, TIFFWriter tiffWriter, long lastIFDPointerOffset)
@@ -359,7 +354,7 @@ public final class TIFFImageWriter extends ImageWriterBase {
                 ListenerDelegate listener = new ListenerDelegate(imageIndex);
                 jpegWriter.addIIOWriteProgressListener(listener);
                 jpegWriter.addIIOWriteWarningListener(listener);
-                jpegWriter.write(renderedImage);
+                jpegWriter.write(null, image, copyParams(param, jpegWriter));
             }
             finally {
                 jpegWriter.dispose();
@@ -392,6 +387,27 @@ public final class TIFFImageWriter extends ImageWriterBase {
         }
 
         return nextIFDPointerOffset;
+    }
+
+    // TODO: Candidate util method
+    private ImageWriteParam copyParams(final ImageWriteParam param, final ImageWriter writer) {
+        if (param == null) {
+            return null;
+        }
+
+        // Always safe
+        ImageWriteParam writeParam = writer.getDefaultWriteParam();
+        writeParam.setSourceSubsampling(param.getSourceXSubsampling(), param.getSourceYSubsampling(), param.getSubsamplingXOffset(), param.getSubsamplingYOffset());
+        writeParam.setSourceRegion(param.getSourceRegion());
+        writeParam.setSourceBands(param.getSourceBands());
+
+        // Only if canWriteCompressed()
+        writeParam.setCompressionMode(param.getCompressionMode());
+        if (param.getCompressionMode() == ImageWriteParam.MODE_EXPLICIT) {
+            writeParam.setCompressionQuality(param.getCompressionQuality());
+        }
+
+        return writeParam;
     }
 
     // TODO: Candidate util method
@@ -515,6 +531,10 @@ public final class TIFFImageWriter extends ImageWriterBase {
             case TIFFBaseline.COMPRESSION_CCITT_MODIFIED_HUFFMAN_RLE:
             case TIFFExtension.COMPRESSION_CCITT_T4:
             case TIFFExtension.COMPRESSION_CCITT_T6:
+                if (image.getSampleModel().getNumBands() != 1 || image.getSampleModel().getSampleSize(0) != 1) {
+                    throw new IllegalArgumentException("CCITT compressions supports 1 sample/pixel, 1 bit/sample only");
+                }
+
                 long option = 0L;
 
                 if (compression != TIFFBaseline.COMPRESSION_CCITT_MODIFIED_HUFFMAN_RLE) {
@@ -841,7 +861,7 @@ public final class TIFFImageWriter extends ImageWriterBase {
                 }
             }
             catch (IIOInvalidTreeException e) {
-                // TODO: How to issue warning when warning requires imageIndex??? Use -1?
+                processWarningOccurred(sequenceIndex, "Could not convert image meta data: " + e.getMessage());
             }
 
             ifd = outData.getIFD();
@@ -902,7 +922,7 @@ public final class TIFFImageWriter extends ImageWriterBase {
     }
 
     @Override
-    public void prepareWriteSequence(IIOMetadata streamMetadata) throws IOException {
+    public void prepareWriteSequence(final IIOMetadata streamMetadata) throws IOException {
         if (writingSequence) {
             throw new IllegalStateException("sequence writing has already been started!");
         }
@@ -917,14 +937,14 @@ public final class TIFFImageWriter extends ImageWriterBase {
     }
 
     @Override
-    public void writeToSequence(IIOImage image, ImageWriteParam param) throws IOException {
+    public void writeToSequence(final IIOImage image, final ImageWriteParam param) throws IOException {
         if (!writingSequence) {
             throw new IllegalStateException("prepareWriteSequence() must be called before writeToSequence()!");
         }
 
-        if (sequenceLastIFDPos > 0) {
-            imageOutput.seek(imageOutput.length());
+        if (sequenceIndex > 0) {
             imageOutput.flushBefore(sequenceLastIFDPos);
+            imageOutput.seek(imageOutput.length());
         }
 
         sequenceLastIFDPos = writePage(sequenceIndex++, image, param, sequenceTIFFWriter, sequenceLastIFDPos);

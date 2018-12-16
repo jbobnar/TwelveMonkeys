@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.twelvemonkeys.common</groupId>
         <artifactId>common</artifactId>
-        <version>3.4.1</version>
+        <version>3.5.1</version>
     </parent>
     <artifactId>common-image</artifactId>
     <packaging>jar</packaging>
@@ -18,13 +18,13 @@
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>common-lang</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
         </dependency>
 
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>common-io</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
         </dependency>
 
         <dependency>

@@ -4,26 +4,28 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.imageio.plugins.psd;
@@ -53,7 +55,7 @@ import java.util.List;
  */
 public final class PSDMetadata extends AbstractMetadata {
 
-    public static final String NATIVE_METADATA_FORMAT_NAME = "com_twelvemonkeys_imageio_psd_image_1.0";
+    static final String NATIVE_METADATA_FORMAT_NAME = "com_twelvemonkeys_imageio_psd_image_1.0";
     static final String NATIVE_METADATA_FORMAT_CLASS_NAME = "com.twelvemonkeys.imageio.plugins.psd.PSDMetadataFormat";
     // TODO: Support TIFF metadata, based on EXIF/XMP + merge in PSD specifics
 
@@ -64,6 +66,7 @@ public final class PSDMetadata extends AbstractMetadata {
     PSDGlobalLayerMask globalLayerMask;
     List<PSDLayerInfo> layerInfo;
 
+    int layerCount;
     long imageResourcesStart;
     long layerAndMaskInfoStart;
     long layersStart;
@@ -92,7 +95,7 @@ public final class PSDMetadata extends AbstractMetadata {
 
     static final String[] PRINT_SCALE_STYLES = {"centered", "scaleToFit", "userDefined"};
 
-    protected PSDMetadata() {
+    PSDMetadata() {
         // TODO: Allow XMP, EXIF (TIFF) and IPTC as extra formats?
         super(true, NATIVE_METADATA_FORMAT_NAME, NATIVE_METADATA_FORMAT_CLASS_NAME, null, null);
     }
@@ -117,7 +120,7 @@ public final class PSDMetadata extends AbstractMetadata {
             root.appendChild(createLayerInfoNode());
         }
 
-        if (globalLayerMask != null) {
+        if (globalLayerMask != null && globalLayerMask != PSDGlobalLayerMask.NULL_MASK) {
             root.appendChild(createGlobalLayerMaskNode());
         }
 
@@ -170,7 +173,7 @@ public final class PSDMetadata extends AbstractMetadata {
 
                 node = new IIOMetadataNode("DisplayInfo");
                 node.setAttribute("colorSpace", DISPLAY_INFO_CS[displayInfo.colorSpace]);
-                
+
                 StringBuilder builder = new StringBuilder();
 
                 for (short color : displayInfo.colors) {
@@ -290,9 +293,11 @@ public final class PSDMetadata extends AbstractMetadata {
 
                 node = new IIOMetadataNode("DirectoryResource");
                 node.setAttribute("type", "IPTC");
-                node.setUserObject(iptc.directory);
+                node.setUserObject(iptc.data);
 
-                appendEntries(node, "IPTC", iptc.directory);
+                if (iptc.getDirectory() != null) {
+                    appendEntries(node, "IPTC", iptc.getDirectory());
+                }
             }
             else if (imageResource instanceof PSDEXIF1Data) {
                 // TODO: Revise/rethink this...
@@ -301,21 +306,25 @@ public final class PSDMetadata extends AbstractMetadata {
                 node = new IIOMetadataNode("DirectoryResource");
                 node.setAttribute("type", "TIFF");
                 // TODO: Set byte[] data instead
-                node.setUserObject(exif.directory);
+                node.setUserObject(exif.data);
 
-                appendEntries(node, "EXIF", exif.directory);
+                if (exif.getDirectory() != null) {
+                    appendEntries(node, "EXIF", exif.getDirectory());
+                }
             }
             else if (imageResource instanceof PSDXMPData) {
                 // TODO: Revise/rethink this... Would it be possible to parse XMP as IIOMetadataNodes? Or is that just stupid...
-                // Or maybe use the Directory approach used by IPTC and EXIF.. 
+                // Or maybe use the Directory approach used by IPTC and EXIF..
                 PSDXMPData xmp = (PSDXMPData) imageResource;
 
                 node = new IIOMetadataNode("DirectoryResource");
                 node.setAttribute("type", "XMP");
-                appendEntries(node, "XMP", xmp.directory);
-
                 // Set the entire XMP document as user data
                 node.setUserObject(xmp.data);
+
+                if (xmp.getDirectory() != null) {
+                    appendEntries(node, "XMP", xmp.getDirectory());
+                }
             }
             else {
                 // Generic resource..
@@ -627,7 +636,7 @@ public final class PSDMetadata extends AbstractMetadata {
 
         // TODO: If no PSDResolutionInfo, this might still be available in the EXIF data...
         Iterator<PSDResolutionInfo> resolutionInfos = getResources(PSDResolutionInfo.class);
-        if (!resolutionInfos.hasNext()) {
+        if (resolutionInfos.hasNext()) {
             PSDResolutionInfo resolutionInfo = resolutionInfos.next();
 
             node = new IIOMetadataNode("HorizontalPixelSize");
@@ -643,7 +652,7 @@ public final class PSDMetadata extends AbstractMetadata {
     }
 
     private static float asMM(final short unit, final float resolution) {
-        // Unit: 1 -> pixels per inch, 2 -> pixels pr cm   
+        // Unit: 1 -> pixels per inch, 2 -> pixels pr cm
         return (unit == 1 ? 25.4f : 10) / resolution;
     }
 
@@ -661,7 +670,7 @@ public final class PSDMetadata extends AbstractMetadata {
             PSDEXIF1Data data = exif.next();
 
             // Get the EXIF DateTime (aka ModifyDate) tag if present
-            Entry dateTime = data.directory.getEntryById(TIFF.TAG_DATE_TIME);
+            Entry dateTime = data.getDirectory().getEntryById(TIFF.TAG_DATE_TIME);
             if (dateTime != null) {
                 IIOMetadataNode imageCreationTime = new IIOMetadataNode("ImageCreationTime"); // As TIFF, but could just as well be ImageModificationTime
                 // Format: "YYYY:MM:DD hh:mm:ss"
@@ -706,7 +715,7 @@ public final class PSDMetadata extends AbstractMetadata {
             if (textResource instanceof PSDIPTCData) {
                 PSDIPTCData iptc = (PSDIPTCData) textResource;
 
-                appendTextEntriesFlat(text, iptc.directory, new FilterIterator.Filter<Entry>() {
+                appendTextEntriesFlat(text, iptc.getDirectory(), new FilterIterator.Filter<Entry>() {
                     public boolean accept(final Entry pEntry) {
                         Integer tagId = (Integer) pEntry.getIdentifier();
 
@@ -726,7 +735,7 @@ public final class PSDMetadata extends AbstractMetadata {
             else if (textResource instanceof PSDEXIF1Data) {
                 PSDEXIF1Data exif = (PSDEXIF1Data) textResource;
 
-                appendTextEntriesFlat(text, exif.directory, new FilterIterator.Filter<Entry>() {
+                appendTextEntriesFlat(text, exif.getDirectory(), new FilterIterator.Filter<Entry>() {
                     public boolean accept(final Entry pEntry) {
                         Integer tagId = (Integer) pEntry.getIdentifier();
 
@@ -742,11 +751,12 @@ public final class PSDMetadata extends AbstractMetadata {
                     }
                 });
             }
-            else if (textResource instanceof PSDXMPData) {
+            //else if (textResource instanceof PSDXMPData) {
                 // TODO: Parse XMP (heavy) ONLY if we don't have required fields from IPTC/EXIF?
                 // TODO: Use XMP IPTC/EXIF/TIFF NativeDigest field to validate if the values are in sync..?
-                PSDXMPData xmp = (PSDXMPData) textResource;
-            }
+                // TODO: Use XMP IPTC/EXIF/TIFF NativeDigest field to validate if the values are in sync..?
+                //PSDXMPData xmp = (PSDXMPData) textResource;
+            //}
         }
 
         return text;
@@ -795,12 +805,15 @@ public final class PSDMetadata extends AbstractMetadata {
         return transparencyNode;
     }
 
-    private boolean hasAlpha() {
-        return header.mode == PSD.COLOR_MODE_RGB && header.channels > 3 ||
-                header.mode == PSD.COLOR_MODE_CMYK & header.channels > 4;
+    boolean hasAlpha() {
+        return layerCount < 0;
     }
 
-    <T extends PSDImageResource> Iterator<T> getResources(final Class<T> resourceType) {
+    int getLayerCount() {
+        return Math.abs(layerCount);
+    }
+
+    private <T extends PSDImageResource> Iterator<T> getResources(final Class<T> resourceType) {
         // NOTE: The cast here is wrong, strictly speaking, but it does not matter...
         @SuppressWarnings({"unchecked"})
         Iterator<T> iterator = (Iterator<T>) imageResources.iterator();
@@ -812,7 +825,7 @@ public final class PSDMetadata extends AbstractMetadata {
         });
     }
 
-    Iterator<PSDImageResource> getResources(final int... resourceTypes) {
+    private Iterator<PSDImageResource> getResources(final int... resourceTypes) {
         Iterator<PSDImageResource> iterator = imageResources.iterator();
 
         return new FilterIterator<>(iterator, new FilterIterator.Filter<PSDImageResource>() {

@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.twelvemonkeys</groupId>
         <artifactId>twelvemonkeys</artifactId>
-        <version>3.4.1</version>
+        <version>3.5.1</version>
     </parent>
 
     <groupId>com.twelvemonkeys.bom</groupId>
@@ -22,120 +22,120 @@
             <dependency>
                 <groupId>com.twelvemonkeys.common</groupId>
                 <artifactId>common-lang</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.common</groupId>
                 <artifactId>common-io</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.common</groupId>
                 <artifactId>common-image</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
 
             <!-- ImageIO common dependencies -->
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-core</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-metadata</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-clippath</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
 
             <!-- ImageIO plugins -->
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-bmp</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-hdr</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-icns</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-iff</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-jpeg</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-pcx</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-pdf</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-pict</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-pnm</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-psd</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-sgi</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-tga</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-thumbsdb</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-tiff</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
 
             <!-- ImageIO 3rd party dependent plugins -->
             <dependency>
                 <groupId>com.twelvemonkeys.imageio</groupId>
                 <artifactId>imageio-batik</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
 
             <!-- Servlet -->
             <dependency>
                 <groupId>com.twelvemonkeys.servlet</groupId>
                 <artifactId>servlet</artifactId>
-                <version>3.4.1</version>
+                <version>3.5.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

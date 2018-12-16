@@ -4,26 +4,28 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.imageio.plugins.svg;
@@ -108,24 +110,25 @@ public class SVGImageReader extends ImageReaderBase {
     public BufferedImage read(int pIndex, ImageReadParam pParam) throws IOException {
         checkBounds(pIndex);
 
-        String baseURI = null;
-
         if (pParam instanceof SVGReadParam) {
             SVGReadParam svgParam = (SVGReadParam) pParam;
-            // Set IIOParams as hints
+
+            // Get the base URI
+            // This must be done before converting the params to hints
+            String baseURI = svgParam.getBaseURI();
+            rasterizer.transcoderInput.setURI(baseURI);
+
+            // Set ImageReadParams as hints
             // Note: The cast to Map invokes a different method that preserves
             // unset defaults, DO NOT REMOVE!
             rasterizer.setTranscodingHints((Map) paramsToHints(svgParam));
-
-            // Get the base URI (not a hint)
-            baseURI = svgParam.getBaseURI();
         }
 
-        Dimension size;
-        if (pParam != null && (size = pParam.getSourceRenderSize()) != null) {
-            // Use size...
+        Dimension size = null;
+        if (pParam != null) {
+            size = pParam.getSourceRenderSize();
         }
-        else {
+        if (size == null) {
             size = new Dimension(getWidth(pIndex), getHeight(pIndex));
         }
 
@@ -135,7 +138,6 @@ public class SVGImageReader extends ImageReaderBase {
         try {
             processImageStarted(pIndex);
 
-            rasterizer.transcoderInput.setURI(baseURI);
             BufferedImage image = rasterizer.getImage();
 
             Graphics2D g = destination.createGraphics();
@@ -153,8 +155,14 @@ public class SVGImageReader extends ImageReaderBase {
             return destination;
         }
         catch (TranscoderException e) {
-            throw new IIOException(e.getMessage(), e);
+            Throwable cause = unwrapException(e);
+            throw new IIOException(cause.getMessage(), cause);
         }
+    }
+
+    private static Throwable unwrapException(TranscoderException ex) {
+        // The TranscoderException is generally useless...
+        return ex.getException() != null ? ex.getException() : ex;
     }
 
     private TranscodingHints paramsToHints(SVGReadParam pParam) throws IOException {
@@ -172,8 +180,8 @@ public class SVGImageReader extends ImageReaderBase {
         }
 
         if (size != null) {
-            hints.put(ImageTranscoder.KEY_WIDTH, new Float(size.getWidth()));
-            hints.put(ImageTranscoder.KEY_HEIGHT, new Float(size.getHeight()));
+            hints.put(ImageTranscoder.KEY_WIDTH, (float) size.getWidth());
+            hints.put(ImageTranscoder.KEY_HEIGHT, (float) size.getHeight());
         }
 
         // Set area of interest
@@ -183,16 +191,16 @@ public class SVGImageReader extends ImageReaderBase {
 
             // Avoid that the batik transcoder scales the AOI up to original image size
             if (size == null) {
-                hints.put(ImageTranscoder.KEY_WIDTH, new Float(region.getWidth()));
-                hints.put(ImageTranscoder.KEY_HEIGHT, new Float(region.getHeight()));
+                hints.put(ImageTranscoder.KEY_WIDTH, (float) region.getWidth());
+                hints.put(ImageTranscoder.KEY_HEIGHT, (float) region.getHeight());
             }
             else {
                 // Need to resize here...
                 double xScale = size.getWidth() / origSize.getWidth();
                 double yScale =  size.getHeight() / origSize.getHeight();
 
-                hints.put(ImageTranscoder.KEY_WIDTH, new Float(region.getWidth() * xScale));
-                hints.put(ImageTranscoder.KEY_HEIGHT, new Float(region.getHeight() * yScale));
+                hints.put(ImageTranscoder.KEY_WIDTH, (float) (region.getWidth() * xScale));
+                hints.put(ImageTranscoder.KEY_HEIGHT, (float) (region.getHeight() * yScale));
             }
         }
         else if (size != null) {
@@ -217,7 +225,7 @@ public class SVGImageReader extends ImageReaderBase {
         return null;
     }
 
-    public ImageReadParam getDefaultReadParam() {
+    public SVGReadParam getDefaultReadParam() {
         return new SVGReadParam();
     }
 
@@ -253,7 +261,7 @@ public class SVGImageReader extends ImageReaderBase {
      */
     private class Rasterizer extends SVGAbstractTranscoder /*ImageTranscoder*/ {
 
-        BufferedImage image = null;
+        private BufferedImage image;
         private TranscoderInput transcoderInput;
         private float defaultWidth;
         private float defaultHeight;
@@ -264,17 +272,19 @@ public class SVGImageReader extends ImageReaderBase {
         private TranscoderException exception;
         private BridgeContext context;
 
-        public BufferedImage createImage(final int width, final int height) {
-            return ImageUtil.createTransparent(width, height);//, BufferedImage.TYPE_INT_ARGB);
+        private BufferedImage createImage(final int width, final int height) {
+            return ImageUtil.createTransparent(width, height); // BufferedImage.TYPE_INT_ARGB
         }
 
         //  This is cheating... We don't fully transcode after all
         protected void transcode(Document document, final String uri, final TranscoderOutput output) throws TranscoderException {
             // Sets up root, curTxf & curAoi
             // ----
-            if ((document != null) && !(document.getImplementation() instanceof SVGDOMImplementation)) {
-                DOMImplementation impl = (DOMImplementation) hints.get(KEY_DOM_IMPLEMENTATION);
-                document = DOMUtilities.deepCloneDocument(document, impl);
+            if (document != null) {
+                if (!(document.getImplementation() instanceof SVGDOMImplementation)) {
+                    DOMImplementation impl = (DOMImplementation) hints.get(KEY_DOM_IMPLEMENTATION);
+                    document = DOMUtilities.deepCloneDocument(document, impl);
+                }
 
                 if (uri != null) {
                     try {
@@ -344,8 +354,8 @@ public class SVGImageReader extends ImageReaderBase {
                 processReadAborted();
                 return null;
             }
-            processImageProgress(10f);
 
+            processImageProgress(10f);
 
             // Hacky workaround below...
             if (gvtRoot == null) {
@@ -367,6 +377,7 @@ public class SVGImageReader extends ImageReaderBase {
             }
             ctx = context;
             // /Hacky
+
             if (abortRequested()) {
                 processReadAborted();
                 return null;
@@ -487,10 +498,8 @@ public class SVGImageReader extends ImageReaderBase {
                 // now we are sure that the aoi is the image size
                 Shape raoi = new Rectangle2D.Float(0, 0, width, height);
                 // Warning: the renderer's AOI must be in user space
-                renderer.repaint(curTxf.createInverse().
-                        createTransformedShape(raoi));
+                renderer.repaint(curTxf.createInverse().createTransformedShape(raoi));
                 // NOTE: repaint above cause nullpointer exception with fonts..???
-
 
                 BufferedImage rend = renderer.getOffScreen();
                 renderer = null; // We're done with it...
@@ -556,18 +565,40 @@ public class SVGImageReader extends ImageReaderBase {
             return image;
         }
 
-        protected int getDefaultWidth() throws TranscoderException {
+        int getDefaultWidth() throws TranscoderException {
             init();
-            return (int) (defaultWidth + 0.5);
+            return (int) Math.ceil(defaultWidth);
         }
 
-        protected int getDefaultHeight() throws TranscoderException {
+        int getDefaultHeight() throws TranscoderException {
             init();
-            return (int) (defaultHeight + 0.5);
+            return (int) Math.ceil(defaultHeight);
         }
 
-        public void setInput(final TranscoderInput pInput) {
+        void setInput(final TranscoderInput pInput) {
             transcoderInput = pInput;
+        }
+
+        @Override
+        protected UserAgent createUserAgent() {
+            return new SVGImageReaderUserAgent();
+        }
+
+        private class SVGImageReaderUserAgent extends SVGAbstractTranscoderUserAgent {
+            @Override
+            public void displayError(Exception e) {
+                displayError(e.getMessage());
+            }
+
+            @Override
+            public void displayError(String message) {
+                displayMessage(message);
+            }
+
+            @Override
+            public void displayMessage(String message) {
+                processWarningOccurred(message.replaceAll("[\\r\\n]+", " "));
+            }
         }
     }
 }

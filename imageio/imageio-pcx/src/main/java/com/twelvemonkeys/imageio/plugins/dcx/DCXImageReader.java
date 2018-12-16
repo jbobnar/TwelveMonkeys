@@ -4,26 +4,28 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.imageio.plugins.dcx;
@@ -42,7 +44,6 @@ import javax.imageio.event.IIOReadWarningListener;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.metadata.IIOMetadataFormatImpl;
 import javax.imageio.spi.ImageReaderSpi;
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -50,14 +51,16 @@ import java.nio.ByteOrder;
 import java.util.Iterator;
 
 public final class DCXImageReader extends ImageReaderBase {
-    // TODO: Delegate listeners with correct index!
+
+    final static boolean DEBUG = "true".equalsIgnoreCase(System.getProperty("com.twelvemonkeys.imageio.plugins.dcx.debug"));
 
     private DCXHeader header;
 
+    private int index = -1;
     private PCXImageReader readerDelegate;
     private ProgressDelegator progressDelegator;
 
-    public DCXImageReader(final ImageReaderSpi provider) {
+    DCXImageReader(final ImageReaderSpi provider) {
         super(provider);
         readerDelegate = new PCXImageReader(provider);
 
@@ -70,62 +73,73 @@ public final class DCXImageReader extends ImageReaderBase {
         readerDelegate.addIIOReadWarningListener(progressDelegator);
     }
 
-    @Override protected void resetMembers() {
+    @Override
+    protected void resetMembers() {
         header = null;
 
+        index = -1;
         readerDelegate.reset();
         installListeners();
     }
 
-    @Override public void dispose() {
+    @Override
+    public void dispose() {
         super.dispose();
 
         readerDelegate.dispose();
         readerDelegate = null;
     }
 
-    @Override public int getWidth(final int imageIndex) throws IOException {
+    @Override
+    public int getWidth(final int imageIndex) throws IOException {
         initIndex(imageIndex);
 
         return readerDelegate.getWidth(0);
     }
 
-    @Override public int getHeight(final int imageIndex) throws IOException {
+    @Override
+    public int getHeight(final int imageIndex) throws IOException {
         initIndex(imageIndex);
 
         return readerDelegate.getHeight(0);
     }
 
-    @Override public ImageTypeSpecifier getRawImageType(final int imageIndex) throws IOException {
+    @Override
+    public ImageTypeSpecifier getRawImageType(final int imageIndex) throws IOException {
         initIndex(imageIndex);
 
         return readerDelegate.getRawImageType(0);
     }
 
-    @Override public Iterator<ImageTypeSpecifier> getImageTypes(final int imageIndex) throws IOException {
+    @Override
+    public Iterator<ImageTypeSpecifier> getImageTypes(final int imageIndex) throws IOException {
         initIndex(imageIndex);
 
         return readerDelegate.getImageTypes(0);
     }
 
-    @Override public BufferedImage read(final int imageIndex, final ImageReadParam param) throws IOException {
+    @Override
+    public BufferedImage read(final int imageIndex, final ImageReadParam param) throws IOException {
         initIndex(imageIndex);
 
         return readerDelegate.read(imageIndex, param);
     }
 
-    @Override public IIOMetadata getImageMetadata(final int imageIndex) throws IOException {
+    @Override
+    public IIOMetadata getImageMetadata(final int imageIndex) throws IOException {
         initIndex(imageIndex);
 
         return readerDelegate.getImageMetadata(0);
     }
 
-    @Override public synchronized void abort() {
+    @Override
+    public synchronized void abort() {
         super.abort();
         readerDelegate.abort();
     }
 
-    @Override public int getNumImages(final boolean allowSearch) throws IOException {
+    @Override
+    public int getNumImages(final boolean allowSearch) throws IOException {
         readHeader();
 
         return header.getCount();
@@ -134,9 +148,11 @@ public final class DCXImageReader extends ImageReaderBase {
     private void initIndex(final int imageIndex) throws IOException {
         checkBounds(imageIndex);
 
-        imageInput.seek(header.getOffset(imageIndex));
-        progressDelegator.index = imageIndex;
-        readerDelegate.setInput(new SubImageInputStream(imageInput, Long.MAX_VALUE));
+        if (index != imageIndex) {
+            imageInput.seek(header.getOffset(imageIndex));
+            index = imageIndex;
+            readerDelegate.setInput(new SubImageInputStream(imageInput, Long.MAX_VALUE));
+        }
     }
 
     private void readHeader() throws IOException {
@@ -145,7 +161,11 @@ public final class DCXImageReader extends ImageReaderBase {
         if (header == null) {
             imageInput.setByteOrder(ByteOrder.LITTLE_ENDIAN);
             header = DCXHeader.read(imageInput);
-//            System.err.println("header: " + header);
+
+            if (DEBUG) {
+                System.err.println("header: " + header);
+            }
+
             imageInput.flushBefore(imageInput.getStreamPosition());
         }
 
@@ -153,11 +173,9 @@ public final class DCXImageReader extends ImageReaderBase {
     }
 
     private class ProgressDelegator extends ProgressListenerBase implements IIOReadWarningListener {
-        private int index;
-
         @Override
         public void imageComplete(ImageReader source) {
-                processImageComplete();
+            processImageComplete();
         }
 
         @Override
@@ -189,7 +207,6 @@ public final class DCXImageReader extends ImageReaderBase {
             processWarningOccurred(warning);
         }
     }
-
 
     public static void main(String[] args) throws IOException {
         DCXImageReader reader = new DCXImageReader(null);

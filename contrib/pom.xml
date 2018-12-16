@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.twelvemonkeys</groupId>
         <artifactId>twelvemonkeys</artifactId>
-        <version>3.4.1</version>
+        <version>3.5.1</version>
     </parent>
     <groupId>com.twelvemonkeys.contrib</groupId>
     <artifactId>contrib</artifactId>
@@ -18,47 +18,47 @@
         <dependency>
             <groupId>com.twelvemonkeys.common</groupId>
             <artifactId>common-lang</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.common</groupId>
             <artifactId>common-io</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.common</groupId>
             <artifactId>common-image</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.common</groupId>
             <artifactId>common-lang</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.common</groupId>
             <artifactId>common-io</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-metadata</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-tiff</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-tiff</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.1</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>

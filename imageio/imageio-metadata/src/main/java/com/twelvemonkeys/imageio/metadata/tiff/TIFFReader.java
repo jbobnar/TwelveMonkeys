@@ -4,31 +4,32 @@
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name "TwelveMonkeys" nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.twelvemonkeys.imageio.metadata.tiff;
 
-import com.twelvemonkeys.imageio.metadata.CompoundDirectory;
 import com.twelvemonkeys.imageio.metadata.Directory;
 import com.twelvemonkeys.imageio.metadata.Entry;
 import com.twelvemonkeys.imageio.metadata.MetadataReader;
@@ -105,24 +106,40 @@ public final class TIFFReader extends MetadataReader {
             throw new IIOException(String.format("Wrong TIFF magic in input data: %04x, expected: %04x", magic, TIFF.TIFF_MAGIC));
         }
 
-        long directoryOffset = readOffset(input);
+        return readLinkedIFDs(input);
+    }
 
-        return readDirectory(input, directoryOffset, true);
+    private TIFFDirectory readLinkedIFDs(final ImageInputStream input) throws IOException {
+        long nextOffset = readOffset(input);
+
+        List<IFD> ifds = new ArrayList<>();
+
+        // Read linked IFDs
+        while (nextOffset != 0) {
+            try {
+                ifds.add(readIFD(input, nextOffset));
+
+                nextOffset = readOffset(input);
+            }
+            catch (EOFException eof) {
+                // catch EOF here as missing EOF marker
+                nextOffset = 0;
+            }
+        }
+
+        return new TIFFDirectory(ifds);
     }
 
     private long readOffset(final ImageInputStream input) throws IOException {
         return longOffsets ? input.readLong() : input.readUnsignedInt();
     }
 
-    // TODO: Consider re-writing so that the linked IFD parsing is done externally to the method
-    protected Directory readDirectory(final ImageInputStream pInput, final long pOffset, final boolean readLinked) throws IOException {
-        List<IFD> ifds = new ArrayList<>();
-        List<Entry> entries = new ArrayList<>();
-
+    private IFD readIFD(final ImageInputStream pInput, final long pOffset) throws IOException {
         pInput.seek(pOffset);
-        long nextOffset = -1;
 
         long entryCount = readEntryCount(pInput);
+
+        List<TIFFEntry> entries = new ArrayList<>();
 
         for (int i = 0; i < entryCount; i++) {
             try {
@@ -137,55 +154,27 @@ public final class TIFFReader extends MetadataReader {
             }
         }
 
-        if (readLinked) {
-            if (nextOffset == -1) {
-                try {
-                    nextOffset = readOffset(pInput);
-                }
-                catch (EOFException e) {
-                    // catch EOF here as missing EOF marker
-                    nextOffset = 0;
-                }
-            }
-
-            // Read linked IFDs
-            if (nextOffset != 0) {
-                CompoundDirectory next = (CompoundDirectory) readDirectory(pInput, nextOffset, true);
-
-                for (int i = 0; i < next.directoryCount(); i++) {
-                    ifds.add((IFD) next.getDirectory(i));
-                }
-            }
-        }
-
         // TODO: Consider leaving to client code what sub-IFDs to parse (but always parse TAG_SUB_IFD).
-        readSubdirectories(pInput, entries,
+        readSubIFDs(pInput, entries,
                 Arrays.asList(TIFF.TAG_EXIF_IFD, TIFF.TAG_GPS_IFD, TIFF.TAG_INTEROP_IFD, TIFF.TAG_SUB_IFD)
         );
 
-        ifds.add(0, new IFD(entries));
-
-        return new TIFFDirectory(ifds);
+        return new IFD(entries);
     }
 
     private long readEntryCount(final ImageInputStream pInput) throws IOException {
-        try {
-            return longOffsets ? pInput.readLong() : pInput.readUnsignedShort();
-        }
-        catch (EOFException e) {
-            // Treat EOF here as empty Sub-IFD
-            return 0;
-        }
+        return longOffsets ? pInput.readLong() : pInput.readUnsignedShort();
     }
 
-    // TODO: Might be better to leave this for client code, as it's tempting go really overboard and support any possible embedded format..
-    private void readSubdirectories(ImageInputStream input, List<Entry> entries, List<Integer> subIFDIds) throws IOException {
+    private void readSubIFDs(ImageInputStream input, List<TIFFEntry> entries, List<Integer> subIFDIds) throws IOException {
         if (subIFDIds == null || subIFDIds.isEmpty()) {
             return;
         }
 
+        long initialPosition = input.getStreamPosition();
+
         for (int i = 0, entriesSize = entries.size(); i < entriesSize; i++) {
-            TIFFEntry entry = (TIFFEntry) entries.get(i);
+            TIFFEntry entry = entries.get(i);
             int tagId = (Integer) entry.getIdentifier();
 
             if (subIFDIds.contains(tagId)) {
@@ -195,10 +184,14 @@ public final class TIFFReader extends MetadataReader {
                         List<IFD> subIFDs = new ArrayList<>(pointerOffsets.length);
 
                         for (long pointerOffset : pointerOffsets) {
-                            CompoundDirectory subDirectory = (CompoundDirectory) readDirectory(input, pointerOffset, false);
-
-                            for (int j = 0; j < subDirectory.directoryCount(); j++) {
-                                subIFDs.add((IFD) subDirectory.getDirectory(j));
+                            try {
+                                subIFDs.add(readIFD(input, pointerOffset));
+                            }
+                            catch (EOFException ignore) {
+                                // TODO: Issue warning
+                                if (DEBUG) {
+                                    ignore.printStackTrace();
+                                }
                             }
                         }
 
@@ -206,7 +199,7 @@ public final class TIFFReader extends MetadataReader {
                             // Replace the entry with parsed data
                             entries.set(i, new TIFFEntry(tagId, entry.getType(), subIFDs.get(0)));
                         }
-                        else {
+                        else if (!subIFDs.isEmpty()) {
                             // Replace the entry with parsed data
                             entries.set(i, new TIFFEntry(tagId, entry.getType(), subIFDs.toArray(new IFD[subIFDs.size()])));
                         }
@@ -221,6 +214,9 @@ public final class TIFFReader extends MetadataReader {
                 }
             }
         }
+
+        // Restore initial position
+        input.seek(initialPosition);
     }
 
     private long[] getPointerOffsets(final Entry entry) throws IIOException {
@@ -533,7 +529,7 @@ public final class TIFFReader extends MetadataReader {
             Directory directory;
 
             if (args.length > 1) {
-                directory = reader.readDirectory(stream, pos, false);
+                directory = reader.readIFD(stream, pos);
             }
             else {
                 directory = reader.read(stream);
