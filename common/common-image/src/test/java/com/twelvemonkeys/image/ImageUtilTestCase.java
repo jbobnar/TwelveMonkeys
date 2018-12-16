@@ -9,6 +9,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.IndexColorModel;
 import java.awt.image.RenderedImage;
 import java.io.InputStream;
+import com.twelvemonkeys.image.ImageUtil;
 
 import static org.junit.Assert.*;
 

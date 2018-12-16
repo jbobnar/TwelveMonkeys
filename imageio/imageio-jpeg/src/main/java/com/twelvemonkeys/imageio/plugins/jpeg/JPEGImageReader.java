@@ -29,9 +29,11 @@
 package com.twelvemonkeys.imageio.plugins.jpeg;
 
 import java.awt.Rectangle;
+import java.awt.color.CMMException;
 import java.awt.color.ColorSpace;
 import java.awt.color.ICC_ColorSpace;
 import java.awt.color.ICC_Profile;
+import java.awt.color.ICC_ProfileGray;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorConvertOp;
 import java.awt.image.DataBuffer;
@@ -46,6 +48,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.SequenceInputStream;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -84,6 +87,12 @@ import com.twelvemonkeys.imageio.util.ImageTypeSpecifiers;
 import com.twelvemonkeys.imageio.util.ProgressListenerBase;
 import com.twelvemonkeys.lang.Validate;
 import com.twelvemonkeys.xml.XMLSerializer;
+
+import sun.java2d.cmm.CMSManager;
+import sun.java2d.cmm.Profile;
+import sun.java2d.cmm.ProfileDataVerifier;
+import sun.java2d.cmm.ProfileDeferralInfo;
+import sun.java2d.cmm.ProfileDeferralMgr;
 
 /**
  * A JPEG {@code ImageReader} implementation based on the JRE {@code JPEGImageReader},
@@ -437,7 +446,10 @@ public final class JPEGImageReader extends ImageReaderBase {
             properties.put(Constants.ICC_PROFILE,profile);
         }
         image = new BufferedImage(image.getColorModel(),destination,image.isAlphaPremultiplied(),properties);
-        if (!Boolean.parseBoolean(System.getProperty(Constants.DO_COLOR_MANAGEMENT, "true"))) {
+        boolean doColorManagement = Boolean.parseBoolean(System.getProperty(Constants.DO_COLOR_MANAGEMENT, "true"));
+        ICC_ColorSpace originalColorSpace = null;
+        if (!doColorManagement) {
+            originalColorSpace = profile != null ? ColorSpaces.createColorSpace(profile) : null;
             // If color management should not be done (taken care of externally), do not do anything with the profile
             profile = null;
         }
@@ -450,10 +462,11 @@ public final class JPEGImageReader extends ImageReaderBase {
         RasterOp convert = null;
         ICC_ColorSpace intendedCS = profile != null ? ColorSpaces.createColorSpace(profile) : null;
 
-        if (profile != null && (csType == JPEGColorSpace.Gray || csType == JPEGColorSpace.GrayA)) {
+//        if (profile != null && (csType == JPEGColorSpace.Gray || csType == JPEGColorSpace.GrayA)) {
+        if (!doColorManagement && (csType == JPEGColorSpace.Gray || csType == JPEGColorSpace.GrayA)) {
             // com.sun. reader does not do ColorConvertOp for CS_GRAY, even if embedded ICC profile,
             // probably because IJG native part does it already...? If applied, color looks wrong (too dark)...
-//            convert = new ColorConvertOp(intendedCS, image.getColorModel().getColorSpace(), null);
+            convert = new ColorConvertOp(originalColorSpace, image.getColorModel().getColorSpace(), null);
         }
         else if (intendedCS != null) {
             // Handle inconsistencies
@@ -947,7 +960,7 @@ public final class JPEGImageReader extends ImageReaderBase {
 
     private ICC_Profile readICCProfileSafe(final InputStream stream, final boolean allowBadProfile) throws IOException {
         try {
-            ICC_Profile profile = ICC_Profile.getInstance(stream);
+            ICC_Profile profile = getInstance(stream);
 
             // NOTE: Need to ensure we have a display profile *before* validating, for the caching to work
             return allowBadProfile ? profile : ColorSpaces.validateProfile(ensureDisplayProfile(profile));
@@ -959,6 +972,100 @@ public final class JPEGImageReader extends ImageReaderBase {
             return null;
         }
     }
+
+    /**
+     * Constructs an ICC_Profile corresponding to the data in an InputStream.
+     * This method throws an IllegalArgumentException if the stream does not
+     * contain valid ICC Profile data.  It throws an IOException if an I/O
+     * error occurs while reading the stream.
+     * @param s The input stream from which to read the profile data.
+     *
+     * @return an <CODE>ICC_Profile</CODE> object corresponding to the
+     *     data in the specified <code>InputStream</code>.
+     *
+     * @exception IOException If an I/O error occurs while reading the stream.
+     *
+     * @exception IllegalArgumentException If the stream does not
+     * contain valid ICC Profile data.
+     */
+    public static ICC_Profile getInstance(InputStream s) throws IOException {
+    byte profileData[];
+
+
+        if ((profileData = getProfileDataFromStream(s)) == null) {
+            throw new IllegalArgumentException("Invalid ICC Profile Data");
+        }
+
+        return getInstance(profileData);
+    }
+
+
+    static byte[] getProfileDataFromStream(InputStream s) throws IOException {
+    byte profileData[];
+    int profileSize;
+
+        byte header[] = new byte[128];
+        int bytestoread = 128;
+        int bytesread = 0;
+        int n;
+
+        while (bytestoread != 0) {
+            if ((n = s.read(header, bytesread, bytestoread)) < 0) {
+                return null;
+            }
+            bytesread += n;
+            bytestoread -= n;
+        }
+        if (header[36] != 0x61 || header[37] != 0x63 ||
+            header[38] != 0x73 || header[39] != 0x70) {
+            return null;   /* not a valid profile */
+        }
+        profileSize = ((header[0] & 0xff) << 24) |
+                      ((header[1] & 0xff) << 16) |
+                      ((header[2] & 0xff) <<  8) |
+                       (header[3] & 0xff);
+        profileData = new byte[profileSize];
+        System.arraycopy(header, 0, profileData, 0, 128);
+        bytestoread = profileSize - 128;
+        bytesread = 128;
+        while (bytestoread != 0) {
+            if ((n = s.read(profileData, bytesread, bytestoread)) < 0) {
+                return null;
+            }
+            bytesread += n;
+            bytestoread -= n;
+        }
+
+        return profileData;
+    }
+
+    public static ICC_Profile getInstance(byte[] data) {
+        ICC_Profile thisProfile;
+
+            Profile p = null;
+
+            if (ProfileDeferralMgr.deferring) {
+                ProfileDeferralMgr.activateProfiles();
+            }
+
+            ProfileDataVerifier.verify(data);
+
+            try {
+                p = CMSManager.getModule().loadProfile(data);
+            } catch (CMMException c) {
+                throw new IllegalArgumentException("Invalid ICC Profile Data");
+            }
+
+            try {
+            Constructor<ICC_ProfileGray> cc = ICC_ProfileGray.class.getDeclaredConstructor(Profile.class);
+            cc.setAccessible(true);
+
+            return cc.newInstance(p);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
 
     @Override
     public boolean canReadRaster() {
