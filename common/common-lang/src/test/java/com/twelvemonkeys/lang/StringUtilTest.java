@@ -583,8 +583,7 @@ public class StringUtilTest {
 
         cal.clear();
         cal.set(2004, 4, 13, 23, 51);
-        date = StringUtil.toDate("13.5.04 23:51",
-                                 DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, new Locale("no", "NO")));
+        date = StringUtil.toDate("13.5.04 23:51", new SimpleDateFormat("dd.M.yy HH:mm"));
         assertNotNull(date);
         assertEquals(cal.getTime(), date);
 
@@ -940,7 +939,7 @@ public class StringUtilTest {
     }
 
     @Test
-    public void testLispToCamelNumber() {    
+    public void testLispToCamelNumber() {
         // Numbers
         assertEquals("my45Caliber", StringUtil.lispToCamel("my-45-caliber"));
     }
