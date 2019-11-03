@@ -1414,7 +1414,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 failBecause("Could not read " + data.getInput() + " with explicit destination " + destination, e);
             }
 
-            assertSame(destination, result);
+            assertSame(destination.getRaster(), result.getRaster());
+            assertSame(destination.getColorModel(), result.getColorModel());
         }
         reader.dispose();
     }
@@ -1441,7 +1442,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 failBecause("Image could not be read", e);
             }
 
-            assertSame(destination, result);
+            assertSame(destination.getRaster(), result.getRaster());
+            assertSame(destination.getColorModel(), result.getColorModel());
         }
         else {
             System.err.println("WARNING: Test skipped due to reader.getRawImageType(0) returning null");
@@ -1471,7 +1473,8 @@ public abstract class ImageReaderAbstractTest<T extends ImageReader> {
                 System.err.println("WARNING: Reader does not throw exception with non-declared destination: " + destination);
 
                 // Test that the destination is really taken into account
-                assertSame(destination, result);
+                assertSame(destination.getRaster(), result.getRaster());
+                assertSame(destination.getColorModel(), result.getColorModel());
             }
             catch (IIOException expected) {
                 // TODO: This is thrown by ImageReader.getDestination. But are we happy with that?
