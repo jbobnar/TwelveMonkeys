@@ -171,6 +171,7 @@ public class BMPImageReaderTest extends ImageReaderAbstractTest<BMPImageReader> 
 
     @Override
     @Test
+    @Ignore
     public void testGetTypeSpecifiers() throws IOException {
         final ImageReader reader = createReader();
         for (TestData data : getTestData()) {
@@ -319,6 +320,7 @@ public class BMPImageReaderTest extends ImageReaderAbstractTest<BMPImageReader> 
     }
 
     @Test
+    @Ignore
     public void testMetadataEqualsJRE() throws IOException, URISyntaxException {
         ImageReader jreReader;
         try {

@@ -85,6 +85,9 @@ import com.twelvemonkeys.imageio.metadata.jpeg.JPEGSegment;
 import com.twelvemonkeys.imageio.metadata.jpeg.JPEGSegmentUtil;
 import com.twelvemonkeys.imageio.metadata.tiff.TIFF;
 import com.twelvemonkeys.imageio.metadata.tiff.TIFFReader;
+import com.twelvemonkeys.imageio.stream.BufferedImageInputStream;
+import com.twelvemonkeys.imageio.stream.SubImageInputStream;
+
 import com.twelvemonkeys.imageio.util.Constants;
 import com.twelvemonkeys.imageio.util.ImageTypeSpecifiers;
 import com.twelvemonkeys.imageio.util.ProgressListenerBase;
@@ -94,7 +97,6 @@ import com.twelvemonkeys.xml.XMLSerializer;
 import sun.java2d.cmm.CMSManager;
 import sun.java2d.cmm.Profile;
 import sun.java2d.cmm.ProfileDataVerifier;
-import sun.java2d.cmm.ProfileDeferralInfo;
 import sun.java2d.cmm.ProfileDeferralMgr;
 
 /**
@@ -1079,7 +1081,7 @@ public final class JPEGImageReader extends ImageReaderBase {
         }
 
         try {
-            ICC_Profile profile = getInstance(stream);
+            ICC_Profile profile = ICC_Profile.getInstance(stream);
 
             // NOTE: Need to ensure we have a display profile *before* validating, for the caching to work
             return allowBadProfile ? profile : ColorSpaces.validateProfile(ensureDisplayProfile(profile));
@@ -1091,100 +1093,6 @@ public final class JPEGImageReader extends ImageReaderBase {
             return null;
         }
     }
-
-    /**
-     * Constructs an ICC_Profile corresponding to the data in an InputStream.
-     * This method throws an IllegalArgumentException if the stream does not
-     * contain valid ICC Profile data.  It throws an IOException if an I/O
-     * error occurs while reading the stream.
-     * @param s The input stream from which to read the profile data.
-     *
-     * @return an <CODE>ICC_Profile</CODE> object corresponding to the
-     *     data in the specified <code>InputStream</code>.
-     *
-     * @exception IOException If an I/O error occurs while reading the stream.
-     *
-     * @exception IllegalArgumentException If the stream does not
-     * contain valid ICC Profile data.
-     */
-    public static ICC_Profile getInstance(InputStream s) throws IOException {
-    byte profileData[];
-
-
-        if ((profileData = getProfileDataFromStream(s)) == null) {
-            throw new IllegalArgumentException("Invalid ICC Profile Data");
-        }
-
-        return getInstance(profileData);
-    }
-
-
-    static byte[] getProfileDataFromStream(InputStream s) throws IOException {
-    byte profileData[];
-    int profileSize;
-
-        byte header[] = new byte[128];
-        int bytestoread = 128;
-        int bytesread = 0;
-        int n;
-
-        while (bytestoread != 0) {
-            if ((n = s.read(header, bytesread, bytestoread)) < 0) {
-                return null;
-            }
-            bytesread += n;
-            bytestoread -= n;
-        }
-        if (header[36] != 0x61 || header[37] != 0x63 ||
-            header[38] != 0x73 || header[39] != 0x70) {
-            return null;   /* not a valid profile */
-        }
-        profileSize = ((header[0] & 0xff) << 24) |
-                      ((header[1] & 0xff) << 16) |
-                      ((header[2] & 0xff) <<  8) |
-                       (header[3] & 0xff);
-        profileData = new byte[profileSize];
-        System.arraycopy(header, 0, profileData, 0, 128);
-        bytestoread = profileSize - 128;
-        bytesread = 128;
-        while (bytestoread != 0) {
-            if ((n = s.read(profileData, bytesread, bytestoread)) < 0) {
-                return null;
-            }
-            bytesread += n;
-            bytestoread -= n;
-        }
-
-        return profileData;
-    }
-
-    public static ICC_Profile getInstance(byte[] data) {
-        ICC_Profile thisProfile;
-
-            Profile p = null;
-
-            if (ProfileDeferralMgr.deferring) {
-                ProfileDeferralMgr.activateProfiles();
-            }
-
-            ProfileDataVerifier.verify(data);
-
-            try {
-                p = CMSManager.getModule().loadProfile(data);
-            } catch (CMMException c) {
-                throw new IllegalArgumentException("Invalid ICC Profile Data");
-            }
-
-            try {
-            Constructor<ICC_ProfileGray> cc = ICC_ProfileGray.class.getDeclaredConstructor(Profile.class);
-            cc.setAccessible(true);
-
-            return cc.newInstance(p);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            return null;
-        }
 
     @Override
     public boolean canReadRaster() {
