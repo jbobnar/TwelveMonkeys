@@ -3,7 +3,7 @@
     <parent>
         <groupId>com.twelvemonkeys</groupId>
         <artifactId>twelvemonkeys</artifactId>
-        <version>3.5-SNAPSHOT</version>
+        <version>3.5.1</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.twelvemonkeys.imageio</groupId>
@@ -48,13 +48,17 @@
         <!-- Wrappers for 3rd party libs  -->
         <module>imageio-batik</module>
 
+        <module>imageio-cr2</module>
+        <module>imageio-dng</module>
+        <module>imageio-nef</module>
+		
         <!-- Test cases for the JRE provided ImageIO plugins -->
         <module>imageio-reference</module>
     </modules>
 
     <properties>
-        <core.version>3.1-SNAPSHOT</core.version>
-        <imageio.core.version>3.1-SNAPSHOT</imageio.core.version>
+        <core.version>3.5.1</core.version>
+        <imageio.core.version>3.5.1</imageio.core.version>
     </properties>
 
     <dependencies>
